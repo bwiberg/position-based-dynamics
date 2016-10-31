@@ -29,6 +29,10 @@ namespace clgl {
         int run();
 
     private:
+        void toggleRecording(bool shouldRecord);
+
+        void recordFrame();
+
         bool setupOpenCL(const std::vector<std::string> args);
 
         bool setupNanoGUI(const std::vector<std::string> args);
@@ -56,6 +60,10 @@ namespace clgl {
 
         bool mSceneIsPlaying;
 
+        bool mIsRecording;
+
+        uint mNextFrameNumber;
+
         class Screen : public nanogui::Screen {
         public:
             Screen(Application &app,
@@ -73,6 +81,8 @@ namespace clgl {
             virtual bool mouseMotionEvent(const Eigen::Vector2i &p, const Eigen::Vector2i &rel, int button, int modifiers) override;
 
             virtual bool scrollEvent(const Eigen::Vector2i &p, const Eigen::Vector2f &rel) override;
+
+            virtual void drawAll() override;
 
         private:
             Application &mApp;
