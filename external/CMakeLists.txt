@@ -58,6 +58,10 @@ set(LODEPNG_HEADER_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/lodepng/lodepng_util.h)
 add_library(lodepng STATIC ${LODEPNG_SOURCE_FILES} ${LODEPNG_HEADER_FILES})
 
+#### ################ ####
+#### #### Assimp #### ####
+#### ################ ####
+find_package(Assimp REQUIRED)
 
 #### Export libraries and header search paths to CMake parent scope ####
 set(EXTERNAL_LIBRARIES
@@ -65,7 +69,8 @@ set(EXTERNAL_LIBRARIES
         ${OPENGL_LIBRARIES}
         nanogui
         bwgl
-        lodepng)
+        lodepng
+        ${ASSIMP_LIBRARY})
 
 set(EXTERNAL_INCLUDE_DIRS
         ${OpenCL_INCLUDE_DIRS}
@@ -75,6 +80,7 @@ set(EXTERNAL_INCLUDE_DIRS
         ${GLM_INCLUDE_DIRS}
         ${CMAKE_CURRENT_SOURCE_DIR}/bwgl/include
         ${BWGL_EXTRA_INCLUDE_DIRS}
+        ${ASSIMP_INCLUDE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR})
 
 ### Print libraries to CMake output ###
