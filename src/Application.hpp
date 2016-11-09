@@ -62,6 +62,16 @@ namespace clgl {
 
         bool mIsRecording;
 
+        uint mRecordCount;
+
+        FILE* ffmpeg;
+
+        int *buffer;
+
+#ifdef TARGET_OS_MAC
+        int *bufferRetina;
+#endif
+
         uint mNextFrameNumber;
 
         class Screen : public nanogui::Screen {
@@ -81,6 +91,8 @@ namespace clgl {
             virtual bool mouseMotionEvent(const Eigen::Vector2i &p, const Eigen::Vector2i &rel, int button, int modifiers) override;
 
             virtual bool scrollEvent(const Eigen::Vector2i &p, const Eigen::Vector2f &rel) override;
+
+            virtual bool resizeEvent(const Eigen::Vector2i &i) override;
 
             virtual void drawAll() override;
 

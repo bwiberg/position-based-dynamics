@@ -1,7 +1,13 @@
 #include "Application.hpp"
 
+#include <stdio.h>
 #include <iostream>
 #include <util/make_unique.hpp>
+#include "util/OCL_CALL.hpp"
+
+#ifdef TARGET_OS_MAC
+#include <CGLCurrent.h>
+#endif
 
 #include <lodepng/lodepng.h>
 #include "util/paths.hpp"
@@ -39,6 +45,8 @@ namespace clgl {
     }
 
     bool Application::setupOpenCL(const std::vector<std::string> args) {
+        OCL_ERROR;
+
         int desiredPlatformIndex = -1;
         int desiredDeviceIndex = -1;
 
@@ -53,7 +61,7 @@ namespace clgl {
         }
 
 #ifdef __linux__
-#define GL_SHARING_EXTENSION "cl_khr_gl_sharing"
+        #define GL_SHARING_EXTENSION "cl_khr_gl_sharing"
         cl_context_properties properties[] = {
             //CL_GL_CONTEXT_KHR, (cl_context_pr
             //CL_GLX_DISPLAY_KHR, (cl_context_properties) glXGetCurrentDisplay(),
@@ -61,7 +69,7 @@ namespace clgl {
             0
         };
 #elif defined _WIN32
-#define GL_SHARING_EXTENSION "cl_khr_gl_sharing"
+        #define GL_SHARING_EXTENSION "cl_khr_gl_sharing"
         cl_context_properties properties[] = {
                 CL_GL_CONTEXT_KHR, (cl_context_properties) wglGetCurrentContext(),
                 CL_WGL_HDC_KHR, (cl_context_properties) wglGetCurrentDC(),
@@ -80,10 +88,10 @@ namespace clgl {
         gcl_gl_set_sharegroup(shareGroup);
 #endif
 
-        mContext = cl::Context({mDevice}, properties);
+        mContext = OCL_CHECK(cl::Context({mDevice}, properties, NULL, NULL, CL_ERROR));
 
         //create queue to which we will push commands for the device.
-        mQueue = cl::CommandQueue(mContext, mDevice);
+        mQueue = OCL_CHECK(cl::CommandQueue(mContext, mDevice, 0, CL_ERROR));
 
         return true;
     }
@@ -104,10 +112,11 @@ namespace clgl {
         }
 
         mScreen = std::move(util::make_unique<Screen>(*this,
-                windowSize, "CL-GL Bootstrap",
-                /*resizable*/true, fullscreen, /*colorBits*/8,
+                                                      windowSize, "CL-GL Bootstrap",
+                /*resizable*/false, fullscreen, /*colorBits*/8,
                 /*alphaBits*/8, /*depthBits*/24, /*stencilBits*/8,
                 /*nSamples*/0));
+        glfwSwapInterval(1);
 
         return true;
     }
@@ -115,7 +124,7 @@ namespace clgl {
     bool Application::trySelectPlatform(int commandLinePlatformIndex) {
         // Get all platforms (drivers)
         std::vector<cl::Platform> allPlatforms;
-        cl::Platform::get(&allPlatforms);
+        OCL_CALL(cl::Platform::get(&allPlatforms));
         if (allPlatforms.size() == 0) {
             std::cerr << "No OpenCL platforms/drivers found. Check your OpenCL installation." << std::endl;
             return false;
@@ -144,7 +153,7 @@ namespace clgl {
 
     bool Application::trySelectDevice(int commandLineDeviceIndex) {
         std::vector<cl::Device> allDevices;
-        mPlatform.getDevices(CL_DEVICE_TYPE_ALL, &allDevices);
+        OCL_CALL(mPlatform.getDevices(CL_DEVICE_TYPE_ALL, &allDevices));
         if (allDevices.size() == 0) {
             std::cerr << " No devices found. Check OpenCL installation!\n";
             return false;
@@ -234,6 +243,9 @@ namespace clgl {
 
         mScene = std::move(sceneCreator(mContext, mDevice, mQueue));
         mScene->addGUI(mScreen.get());
+        mScene->setIsKeyDownFunctor([=](int glfwKey) {
+            return glfwGetKey(this->mScreen->glfwWindow(), glfwKey) == GLFW_PRESS;
+        });
         mScreen->performLayout();
 
         mScene->reset();
@@ -245,41 +257,56 @@ namespace clgl {
         mScreen->drawAll();
         mScreen->setVisible(true);
 
-        nanogui::mainloop();
+        nanogui::mainloop(1);
 
         return 0;
     }
 
     void Application::toggleRecording(bool shouldRecord) {
         mIsRecording = shouldRecord;
+
+        if (shouldRecord) {
+#ifdef TARGET_OS_MAC
+            int width = 2 * mScreen->width();
+            int height = 2 * mScreen->height();
+#else
+            int width = mScreen->width();
+            int height = mScreen->height();
+#endif
+
+            buffer = new int[width * height];
+
+            const std::string filename = OUTPUTPATH("output" + std::to_string(mRecordCount++) + ".mp4");
+            const std::string resolution = std::to_string(width) + "x" + std::to_string(height);
+            const std::string scaledResolution = std::to_string(width) + ":" + std::to_string(height);
+
+
+            // start ffmpeg telling it to expect raw rgba 60hz frames
+            // -i - tells it to read frames from stdin
+            const std::string cmd = "ffmpeg -r 60 -f rawvideo -pix_fmt rgba -s " + resolution + " -i - "
+                    "-threads 0 -preset fast -y -pix_fmt yuv420p -crf 21 -vf vflip " + filename;
+
+            // open pipe to ffmpeg's stdin in binary write mode
+            ffmpeg = popen(cmd.c_str(), "w");
+
+        } else {
+            pclose(ffmpeg);
+            delete[] buffer;
+            buffer = nullptr;
+            ffmpeg = nullptr;
+        }
     }
 
     void Application::recordFrame() {
-        std::stringstream ss;
-        ss << std::setw(4) << std::setfill('0') << mNextFrameNumber++ << ".png";
-        const std::string framename = OUTPUTPATH(ss.str());
-
-        std::ofstream fs(framename);
-        std::cout << framename << std::endl;
-
-        const uint width  = static_cast<uint>(mScreen->width());
-        const uint height = static_cast<uint>(mScreen->height());
-
-        std::vector<GLubyte> pixels;
-        pixels.resize(3 * width * height);
-
-        glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
-
-        std::vector<unsigned char> image(pixels.begin(), pixels.end());
-
-        //Encode the image
-        unsigned error = lodepng::encode(framename,
-                                         image,
-                                         width, height,
-                                         LCT_RGB, 8);
-
-        //if there's an error, display it
-        if(error) std::cout << "encoder error " << error << ": "<< lodepng_error_text(error) << std::endl;
+#ifdef TARGET_OS_MAC
+        int width = 2 * mScreen->width();
+        int height = 2 * mScreen->height();
+#else
+        int width = mScreen->width();
+        int height = mScreen->height();
+#endif
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+        fwrite(buffer, sizeof(int) * width * height, 1, ffmpeg);
     }
 
     Application::Screen::Screen(Application &app,
@@ -301,7 +328,7 @@ namespace clgl {
         drawContents();
         drawWidgets();
 
-        if (mApp.mSceneIsPlaying && mApp.mIsRecording) {
+        if (mApp.mIsRecording) {
             mApp.recordFrame();
         }
 
@@ -340,5 +367,10 @@ namespace clgl {
         if (Widget::scrollEvent(p, rel)) { return true; }
         if (!mApp.mScene) { return false; }
         return !mApp.mScene->scrollEvent(glm::ivec2(p[0], p[1]), glm::vec2(rel[0], rel[1]));
+    }
+
+    bool Application::Screen::resizeEvent(const Eigen::Vector2i &i) {
+        if (!mApp.mScene) { return false; }
+        return !mApp.mScene->resizeEvent(glm::ivec2(i[0], i[1]));
     }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <functional>
 
 #include <CL/cl.hpp>
 #include <nanogui/nanogui.h>
@@ -12,7 +13,7 @@ namespace clgl {
     class BaseScene {
     public:
         BaseScene(cl::Context &context, cl::Device &device, cl::CommandQueue &queue)
-            : mContext(context), mDevice(device), mQueue(queue) {
+                : mContext(context), mDevice(device), mQueue(queue) {
         }
 
         /**
@@ -42,6 +43,14 @@ namespace clgl {
          */
         virtual void render() = 0;
 
+        inline bool isKeyDown(int glfwKey) {
+            return mIsKeyDownFunctor(glfwKey);
+        }
+
+        inline void setIsKeyDownFunctor(const std::function<bool(int)> &isKeyDownFunctor)  {
+            mIsKeyDownFunctor = isKeyDownFunctor;
+        }
+
         //////////////
         /// EVENTS ///
         //////////////
@@ -56,11 +65,16 @@ namespace clgl {
 
         virtual bool scrollEvent(const glm::ivec2 &p, const glm::vec2 &rel) { return false; };
 
+        virtual bool resizeEvent(const glm::ivec2 &p) { return false; }
+
     protected:
         cl::Context &mContext;
 
         cl::Device &mDevice;
 
         cl::CommandQueue &mQueue;
+
+    private:
+        std::function<bool(int)> mIsKeyDownFunctor;
     };
 }
