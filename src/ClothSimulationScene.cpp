@@ -12,11 +12,12 @@
 namespace pbd {
     ClothSimulationScene::ClothSimulationScene(cl::Context &context, cl::Device &device, cl::CommandQueue &queue)
             : BaseScene(context, device, queue) {
+        mCurrentSetup = RESOURCEPATH("setups/cloth_sheet.json");
+
         loadShaders();
 
         createCamera();
         createLights();
-        loadObjects();
 
         loadKernels();
     }
@@ -41,6 +42,15 @@ namespace pbd {
             loadKernels();
         });
 
+        b = new Button(win, "Load setup");
+        b->setCallback([&](){
+            const std::string filename = file_dialog({ {"json", "Javascript Object Notation"},
+                                                       {"json", "Javascript Object Notation"} }, false);
+
+            mCurrentSetup = filename;
+            reset();
+        });
+
         /// FPS Labels
         mLabelAverageFrameTime = new Label(win, "");
         mLabelFPS = new Label(win, "");
@@ -50,6 +60,8 @@ namespace pbd {
     void ClothSimulationScene::reset() {
         while (!mSimulationTimes.empty()) mSimulationTimes.pop_back();
         updateTimeLabelsInGUI(0.0);
+
+        loadSetup();
     }
 
     void ClothSimulationScene::update() {
@@ -158,6 +170,17 @@ namespace pbd {
 
     }
 
+    void ClothSimulationScene::loadSetup() {
+        auto groundMesh = MeshLoader::LoadClothMesh(RESOURCEPATH("models/plane.obj"));
+        groundMesh->uploadHostData();
+        groundMesh->generateBuffersCL(mContext);
+        groundMesh->clearHostData();
+
+        auto meshObject = std::make_shared<clgl::MeshObject>(groundMesh, mCheckerboardShader);
+        meshObject->scale(100.0f);
+        mRenderObjects.push_back(meshObject);
+    }
+
     void ClothSimulationScene::createCamera() {
         mCameraRotator = std::make_shared<clgl::SceneObject>();
         mCameraRotator->translate(glm::vec3(0.0f, -1.0f, 0.0f));
@@ -176,17 +199,6 @@ namespace pbd {
         mLights.push_back(mAmbLight);
         mLights.push_back(mDirLight);
         //mLights.push_back(mPointLight);
-    }
-
-    void ClothSimulationScene::loadObjects() {
-        auto groundMesh = MeshLoader::LoadClothMesh(RESOURCEPATH("models/plane.obj"));
-        groundMesh->uploadHostData();
-        groundMesh->generateBuffersCL(mContext);
-        groundMesh->clearHostData();
-
-        auto meshObject = std::make_shared<clgl::MeshObject>(groundMesh, mCheckerboardShader);
-        meshObject->scale(100.0f);
-        mRenderObjects.push_back(meshObject);
     }
 
     void ClothSimulationScene::updateTimeLabelsInGUI(double timeSinceLastUpdate) {

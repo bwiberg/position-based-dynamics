@@ -1,0 +1,15 @@
+{
+  "name": "Cloth sheet",
+  "camera": {
+    "position": [0.0, 0.0, 10.0],
+    "fovY": 75
+  },
+  "meshes": [
+    {
+      "cloth": true,
+      "path": "models/plane.obj",
+      "position": [0.0, 0.0, 0.0],
+      "orientation": [3.14159, 0.0, 0.0]
+    }
+  ]
+}

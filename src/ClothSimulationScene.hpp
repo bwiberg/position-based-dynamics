@@ -41,11 +41,13 @@ namespace pbd {
 
         void createLights();
 
-        void loadObjects();
-
         void loadShaders();
 
         void loadKernels();
+
+        void loadSetup();
+
+        std::string mCurrentSetup;
 
         std::shared_ptr<clgl::Camera> mCamera;
 
