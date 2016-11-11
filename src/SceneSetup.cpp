@@ -30,7 +30,7 @@ pbd::SceneSetup pbd::SceneSetup::LoadFromJsonString(const std::string &str) {
 
     {
         json shaders = j["shaders"];
-        std::for_each(shaders.cbegin(), shaders.cend(), [&setup](const json &jshader) {
+        for (const auto &jshader : shaders) {
             ShaderConfig shader;
 
             shader.name = jshader["name"];
@@ -38,13 +38,13 @@ pbd::SceneSetup pbd::SceneSetup::LoadFromJsonString(const std::string &str) {
             shader.fragment = jshader["fragment"];
 
             setup.shaders.push_back(shader);
-        });
+        }
         setup.shaders.shrink_to_fit();
     }
 
     {
         json meshes = j["meshes"];
-        std::for_each(meshes.cbegin(), meshes.cend(), [&setup](const json &jmesh) {
+        for (const auto &jmesh : meshes) {
             MeshConfig mesh;
 
             mesh.isCloth = jmesh["isCloth"];
@@ -55,7 +55,7 @@ pbd::SceneSetup pbd::SceneSetup::LoadFromJsonString(const std::string &str) {
             mesh.scale = jmesh["scale"];
 
             setup.meshes.push_back(mesh);
-        });
+        }
         setup.meshes.shrink_to_fit();
     }
 

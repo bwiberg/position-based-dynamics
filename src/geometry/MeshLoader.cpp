@@ -8,7 +8,6 @@
 #include <SOIL.h>
 
 #include <map>
-#include <iostream>
 
 namespace pbd {
     namespace MeshLoader {
@@ -73,63 +72,59 @@ namespace pbd {
             uint triangleID = 0;
 
             /// Build look-up table for edge->triangles and triangle->edges
-            std::for_each(triangles.cbegin(),
-                          triangles.cend(),
-                          [&](const Triangle &tri) {
-                              minv = util::min(tri.vertices.x, tri.vertices.y, tri.vertices.z);
-                              medv = util::median(tri.vertices.x, tri.vertices.y, tri.vertices.z);
-                              maxv = util::max(tri.vertices.x, tri.vertices.y, tri.vertices.z);
+            for (const auto &tri : triangles) {
+                minv = util::min(tri.vertices.x, tri.vertices.y, tri.vertices.z);
+                medv = util::median(tri.vertices.x, tri.vertices.y, tri.vertices.z);
+                maxv = util::max(tri.vertices.x, tri.vertices.y, tri.vertices.z);
 
-                              e0 = std::make_pair(minv, medv);
-                              e1 = std::make_pair(medv, maxv);
-                              e2 = std::make_pair(minv, maxv);
+                e0 = std::make_pair(minv, medv);
+                e1 = std::make_pair(medv, maxv);
+                e2 = std::make_pair(minv, maxv);
 
-                              edgeTriangles[e0].push_back(triangleID);
-                              edgeTriangles[e1].push_back(triangleID);
-                              edgeTriangles[e2].push_back(triangleID);
+                edgeTriangles[e0].push_back(triangleID);
+                edgeTriangles[e1].push_back(triangleID);
+                edgeTriangles[e2].push_back(triangleID);
 
-                              triangleEdges[triangleID].push_back(e0);
-                              triangleEdges[triangleID].push_back(e1);
-                              triangleEdges[triangleID].push_back(e2);
+                triangleEdges[triangleID].push_back(e0);
+                triangleEdges[triangleID].push_back(e1);
+                triangleEdges[triangleID].push_back(e2);
 
-                              ++triangleID;
-                          });
+                ++triangleID;
+            }
 
             triangleID = 0;
             std::vector<uint> sharingTriangles;
             ClothTriangleData data;
 
             /// Look up the neighbouring triangle for each edge of every triangle
-            std::for_each(triangles.cbegin(),
-                          triangles.cend(),
-                          [&](const Triangle &tri) {
-                              data.triangleID = triangleID;
+            for (const auto &tri : triangles) {
+                data.triangleID = triangleID;
 
-                              // Find the sharing triangle for each of this triangle's edges
-                              for (uint edgeid = 0; edgeid < 3; ++edgeid) {
-                                  sharingTriangles = edgeTriangles[triangleEdges[triangleID][edgeid]];
+                // Find the sharing triangle for each of this triangle's edges
+                for (uint edgeid = 0; edgeid < 3; ++edgeid) {
+                    sharingTriangles = edgeTriangles[triangleEdges[triangleID][edgeid]];
 
-                                  // The only triangle that uses this edge is itself
-                                  if (sharingTriangles.size() == 1) {
-                                      data.neighbourIDs[edgeid] = -1;
-                                      continue;
-                                  }
+                    // The only triangle that uses this edge is itself
+                    if (sharingTriangles.size() == 1) {
+                        data.neighbourIDs[edgeid] = -1;
+                        continue;
+                    }
 
-                                  // There is exactly one (for manifold meshes) other triangle
-                                  // that uses this edge
-                                  if (sharingTriangles[0] != triangleID)
-                                      data.neighbourIDs[edgeid] = sharingTriangles[0];
-                                  else data.neighbourIDs[edgeid] = sharingTriangles[1];
-                              }
+                    // There is exactly one (for manifold meshes) other triangle
+                    // that uses this edge
+                    if (sharingTriangles[0] != triangleID)
+                        data.neighbourIDs[edgeid] = sharingTriangles[0];
+                    else data.neighbourIDs[edgeid] = sharingTriangles[1];
+                }
 
-                              clothTriangleData[triangleID] = data;
-                              ++triangleID;
-                          });
+                clothTriangleData[triangleID] = data;
+                ++triangleID;
+            }
 
 #ifndef NDEBUG
-            std::for_each(clothTriangleData.cbegin(), clothTriangleData.cend(), [&clothTriangleData](const ClothTriangleData &data){
+            for (const auto &ctdata : clothTriangleData) {
                 for (uint i = 0; i < 3; ++i) {
-                    const int neighbourID = data.neighbourIDs[i];
+                    const int neighbourID = ctdata.neighbourIDs[i];
 
                     if (neighbourID == -1) continue;
 
@@ -137,10 +132,10 @@ namespace pbd {
                     auto neighbour = clothTriangleData[neighbourID];
                     assert(std::find(std::begin(neighbour.neighbourIDs),
                                      std::end(neighbour.neighbourIDs),
-                                     data.triangleID)
+                                     ctdata.triangleID)
                            != std::end(neighbour.neighbourIDs));
                 }
-            });
+            }
 #endif
 
             return clothTriangleData;

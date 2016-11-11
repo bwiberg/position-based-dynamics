@@ -24,15 +24,15 @@ namespace pbd {
 
     void Mesh::flipNormals() {
         // Flip the direction of each geometric normal
-        std::for_each(mVertices.begin(), mVertices.end(), [](Vertex &vertex) {
+        for (auto &vertex : mVertices) {
             vertex.normal = -vertex.normal;
-        });
+        }
 
         // Swap the indices of each triangle/face, so that OpenGL
         // correctly culls faces based on index ordering.
-        std::for_each(mTriangles.begin(), mTriangles.end(), [](Triangle &triangle) {
+        for (auto &triangle : mTriangles) {
             std::swap(triangle.vertices[1], triangle.vertices[2]);
-        });
+        }
     }
 
     void Mesh::uploadHostData() {
