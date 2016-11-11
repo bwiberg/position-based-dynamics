@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BaseScene.hpp"
+#include "SceneSetup.hpp"
 
 #include <bwgl/bwgl.hpp>
 
@@ -12,6 +13,7 @@
 
 #include <deque>
 #include <rendering/RenderObject.hpp>
+#include <geometry/Mesh.hpp>
 
 namespace pbd {
     /// @brief //todo add brief description to FluidScene
@@ -47,7 +49,10 @@ namespace pbd {
 
         void loadSetup();
 
-        std::string mCurrentSetup;
+        void displayError(const std::string &str = "");
+
+        std::string mCurrentSetupFile;
+        SceneSetup mCurrentSetup;
 
         std::shared_ptr<clgl::Camera> mCamera;
 
@@ -58,11 +63,11 @@ namespace pbd {
         std::shared_ptr<clgl::PointLight> mPointLight;
 
         std::vector<std::shared_ptr<clgl::Light>> mLights;
-        std::vector<std::shared_ptr<clgl::BaseShader>> mShaders;
         std::vector<std::shared_ptr<clgl::RenderObject>> mRenderObjects;
 
-        std::shared_ptr<clgl::BaseShader> mBaseShader;
-        std::shared_ptr<clgl::BaseShader> mCheckerboardShader;
+        std::vector<std::shared_ptr<pbd::ClothMesh>> mClothMeshes;
+
+        std::map<std::string, std::shared_ptr<clgl::BaseShader>> mShaders;
 
         bool mIsRotatingCamera;
 
@@ -80,5 +85,6 @@ namespace pbd {
 
         nanogui::Label *mLabelFPS;
         nanogui::Label *mLabelAverageFrameTime;
+        nanogui::Label *mErrorLabel;
     };
 }

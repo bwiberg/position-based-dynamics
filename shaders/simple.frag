@@ -23,9 +23,9 @@ struct PointLight {
     Attenuation att;
 };
 
-uniform DirectionalLight directionalLight;
-uniform AmbientLight ambientLight;
-uniform PointLight pointLight;
+uniform DirectionalLight directional;
+uniform AmbientLight ambient;
+uniform PointLight point;
 
 in vec4 WorldPosition;
 in vec3 Normal;
@@ -35,21 +35,21 @@ in vec4 Color;
 out vec4 color;
 
 vec3 calcAmbColor() {
-    return ambientLight.color * ambientLight.intensity;
+    return Color.rgb * ambient.color * ambient.intensity;
 }
 
 vec3 calcDirColor() {
-    return max(dot(-directionalLight.dir, Normal), 0) * directionalLight.intensity *
-                                   vec3(Color) * directionalLight.color;
+    return max(dot(-directional.dir, Normal), 0) * directional.intensity *
+                                   Color.rgb * directional.color;
 }
 
 vec3 calcPointColor() {
-    float dist = length(WorldPosition.xyz - pointLight.position.xyz);
-    vec3 dir = (pointLight.position.xyz - WorldPosition.xyz) / dist;
+    float dist = length(WorldPosition.xyz - point.position.xyz);
+    vec3 dir = (point.position.xyz - WorldPosition.xyz) / dist;
 
-    vec3 clr = max(dot(dir, Normal), 0) * pointLight.intensity * vec3(Color) * pointLight.color;
+    vec3 clr = max(dot(dir, Normal), 0) * point.intensity * color.rgb * point.color;
 
-    return clr / (1 + pointLight.att.a * dist + pointLight.att.b * dist * dist);
+    return clr / (1 + point.att.a * dist + point.att.b * dist * dist);
 }
 
 void main() {

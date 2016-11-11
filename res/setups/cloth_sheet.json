@@ -4,12 +4,34 @@
     "position": [0.0, 0.0, 10.0],
     "fovY": 75
   },
+  "shaders": [
+    {
+      "name": "checkerboard",
+      "vertex": "simple.vert",
+      "fragment": "checkerboard.frag"
+    },
+    {
+      "name": "simple",
+      "vertex": "simple.vert",
+      "fragment": "simple.frag"
+    }
+  ],
   "meshes": [
     {
-      "cloth": true,
-      "path": "models/plane.obj",
+      "isCloth": true,
+      "path": "models/cube.obj",
+      "shader": "simple",
       "position": [0.0, 0.0, 0.0],
-      "orientation": [3.14159, 0.0, 0.0]
+      "orientation": [3.14159, 0.0, 0.0],
+      "scale": 2.0
+    },
+    {
+      "isCloth": false,
+      "path": "models/plane.obj",
+      "shader": "checkerboard",
+      "position": [0.0, 0.0, 0.0],
+      "orientation": [0.0, 0.0, 0.0],
+      "scale": 100.0
     }
   ]
 }

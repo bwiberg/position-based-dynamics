@@ -1,4 +1,5 @@
 #include "ClothSimulationScene.hpp"
+#include "SceneSetup.hpp"
 
 #include <iomanip>
 
@@ -12,7 +13,7 @@
 namespace pbd {
     ClothSimulationScene::ClothSimulationScene(cl::Context &context, cl::Device &device, cl::CommandQueue &queue)
             : BaseScene(context, device, queue) {
-        mCurrentSetup = RESOURCEPATH("setups/cloth_sheet.json");
+        mCurrentSetupFile = RESOURCEPATH("setups/cloth_sheet.json");
 
         loadShaders();
 
@@ -33,9 +34,11 @@ namespace pbd {
         win->setPosition(Eigen::Vector2i(15, 125));
         win->setLayout(new GroupLayout());
 
+        mErrorLabel = new Label(win, "Status:");
+
         Button *b = new Button(win, "Reload shaders");
         b->setCallback([this]() {
-            for (auto shader : mShaders) shader->compile();
+            loadShaders();
         });
         b = new Button(win, "Reload kernels");
         b->setCallback([this]() {
@@ -47,7 +50,7 @@ namespace pbd {
             const std::string filename = file_dialog({ {"json", "Javascript Object Notation"},
                                                        {"json", "Javascript Object Notation"} }, false);
 
-            mCurrentSetup = filename;
+            mCurrentSetupFile = filename;
             reset();
         });
 
@@ -61,6 +64,9 @@ namespace pbd {
         while (!mSimulationTimes.empty()) mSimulationTimes.pop_back();
         updateTimeLabelsInGUI(0.0);
 
+        mRenderObjects.clear();
+        mClothMeshes.clear();
+        //mLights.clear();
         loadSetup();
     }
 
@@ -108,15 +114,20 @@ namespace pbd {
         const glm::mat4 VP = mCamera->getPerspectiveTransform() * glm::inverse(mCamera->getTransform());
 
         for (auto shader : mShaders) {
-            shader->use();
+            shader.second->use();
             for (auto light : mLights) {
-                light->setUniformsInShader(shader, light->getType());
+                light->setUniformsInShader(shader.second, light->getType());
             }
         }
 
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
         for (auto renderObject : mRenderObjects) {
             renderObject->render(VP);
         }
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
     }
 
     bool ClothSimulationScene::mouseButtonEvent(const glm::ivec2 &p, int button, bool down, int modifiers) {
@@ -153,17 +164,13 @@ namespace pbd {
     }
 
     void ClothSimulationScene::loadShaders() {
-        mBaseShader = std::make_shared<clgl::BaseShader>(
-                std::unordered_map<GLuint, std::string>{{GL_VERTEX_SHADER,   SHADERPATH("simple.vert")},
-                                                        {GL_FRAGMENT_SHADER, SHADERPATH("simple.frag")}});
-        mBaseShader->compile();
-        mShaders.push_back(mBaseShader);
-
-        mCheckerboardShader = std::make_shared<clgl::BaseShader>(
-                std::unordered_map<GLuint, std::string>{{GL_VERTEX_SHADER,   SHADERPATH("simple.vert")},
-                                                        {GL_FRAGMENT_SHADER, SHADERPATH("checkerboard.frag")}});
-        mCheckerboardShader->compile();
-        mShaders.push_back(mCheckerboardShader);
+        for (SceneSetup::ShaderConfig config : mCurrentSetup.shaders) {
+            auto shader = std::make_shared<clgl::BaseShader>(
+                    std::unordered_map<GLuint, std::string>{{GL_VERTEX_SHADER,   SHADERPATH(config.vertex)},
+                                                            {GL_FRAGMENT_SHADER, SHADERPATH(config.fragment)}});
+            shader->compile();
+            mShaders[config.name] = shader;
+        }
     }
 
     void ClothSimulationScene::loadKernels() {
@@ -171,14 +178,46 @@ namespace pbd {
     }
 
     void ClothSimulationScene::loadSetup() {
-        auto groundMesh = MeshLoader::LoadClothMesh(RESOURCEPATH("models/plane.obj"));
-        groundMesh->uploadHostData();
-        groundMesh->generateBuffersCL(mContext);
-        groundMesh->clearHostData();
+        std::string contents = "";
+        if (!bwgl::TryReadFromFile(mCurrentSetupFile, contents)) {
+            displayError("Failed to load setup");
+        }
 
-        auto meshObject = std::make_shared<clgl::MeshObject>(groundMesh, mCheckerboardShader);
-        meshObject->scale(100.0f);
-        mRenderObjects.push_back(meshObject);
+        displayError();
+
+        mCurrentSetup = SceneSetup::LoadFromJsonString(contents);
+        mCurrentSetup.filepath = mCurrentSetupFile;
+
+        mCameraRotator->setEulerAngles(glm::vec3(0.0f, 0.0f, 0.0f));
+        mCamera->setFieldOfViewY(mCurrentSetup.camera.fovY);
+        mCamera->setPosition(mCurrentSetup.camera.position);
+
+        loadShaders();
+
+        for (SceneSetup::MeshConfig meshconfig : mCurrentSetup.meshes) {
+            std::shared_ptr<pbd::Mesh> mesh;
+
+            if (meshconfig.isCloth) {
+                auto cloth = MeshLoader::LoadClothMesh(RESOURCEPATH(meshconfig.path));
+                mClothMeshes.push_back(cloth);
+                mesh = cloth;
+            } else {
+                mesh = MeshLoader::LoadMesh(RESOURCEPATH(meshconfig.path));
+            }
+
+            mesh->uploadHostData();
+            mesh->generateBuffersCL(mContext);
+            mesh->clearHostData();
+
+            auto shader = mShaders[meshconfig.shader];
+
+            auto meshobject = std::make_shared<clgl::MeshObject>(mesh, shader);
+            meshobject->setScale(meshconfig.scale);
+            meshobject->setEulerAngles(meshconfig.orientation);
+            meshobject->setPosition(meshconfig.position);
+
+            mRenderObjects.push_back(meshobject);
+        }
     }
 
     void ClothSimulationScene::createCamera() {
@@ -216,6 +255,10 @@ namespace pbd {
         double FPS = mFramesSinceLastUpdate / timeSinceLastUpdate;
         ss << "Average FPS: " << std::setprecision(3) << FPS;
         mLabelFPS->setCaption(ss.str());
+    }
+
+    void ClothSimulationScene::displayError(const std::string &str) {
+        mErrorLabel->setCaption(str);
     }
 
     const uint ClothSimulationScene::NUM_AVG_SIM_TIMES = 10;

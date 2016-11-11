@@ -214,6 +214,7 @@ namespace pbd {
             }
 
             importer.FreeScene();
+            //mesh->flipNormals();
             return mesh;
         }
 
