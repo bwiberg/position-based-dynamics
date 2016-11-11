@@ -46,22 +46,16 @@ message(WARNING ${BWGL_EXTRA_INCLUDE_DIRS})
 
 #### Khronos C++ OpenCL Wrapper API ####
 
-#### ################# ####
-#### #### LodePNG #### ####
-#### ################# ####
-set(LODEPNG_SOURCE_FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/lodepng/lodepng.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/lodepng/lodepng_util.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/lodepng/pngdetail.cpp)
-set(LODEPNG_HEADER_FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/lodepng/lodepng.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/lodepng/lodepng_util.h)
-add_library(lodepng STATIC ${LODEPNG_SOURCE_FILES} ${LODEPNG_HEADER_FILES})
-
 #### ################ ####
 #### #### Assimp #### ####
 #### ################ ####
 find_package(Assimp REQUIRED)
+
+#### ############## ####
+#### #### SOIL #### ####
+#### ############## ####
+add_subdirectory(soil)
+set(SOIL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/soil/src)
 
 #### Export libraries and header search paths to CMake parent scope ####
 set(EXTERNAL_LIBRARIES
@@ -69,8 +63,8 @@ set(EXTERNAL_LIBRARIES
         ${OPENGL_LIBRARIES}
         nanogui
         bwgl
-        lodepng
-        ${ASSIMP_LIBRARY})
+        ${ASSIMP_LIBRARY}
+        SOIL)
 
 set(EXTERNAL_INCLUDE_DIRS
         ${OpenCL_INCLUDE_DIRS}
@@ -81,6 +75,7 @@ set(EXTERNAL_INCLUDE_DIRS
         ${CMAKE_CURRENT_SOURCE_DIR}/bwgl/include
         ${BWGL_EXTRA_INCLUDE_DIRS}
         ${ASSIMP_INCLUDE_DIR}
+        ${SOIL_INCLUDE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR})
 
 ### Print libraries to CMake output ###

@@ -7,3 +7,6 @@
 [submodule "external/lodepng"]
 	path = external/lodepng
 	url = https://github.com/lvandeve/lodepng.git
+[submodule "external/soil"]
+	path = external/soil
+	url = https://github.com/bwiberg/Simple-OpenGL-Image-Library.git

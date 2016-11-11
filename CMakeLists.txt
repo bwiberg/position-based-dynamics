@@ -21,6 +21,7 @@ set(SOURCE_FILES ${SOURCE_FILES} main.cpp)
 add_definitions(-DOUTPUT_FOLDER="${CMAKE_CURRENT_SOURCE_DIR}/output/")
 add_definitions(-DSHADERS_FOLDER="${CMAKE_CURRENT_SOURCE_DIR}/shaders/")
 add_definitions(-DKERNELS_FOLDER="${CMAKE_CURRENT_SOURCE_DIR}/kernels/")
+add_definitions(-DRESOURCES_FOLDER="${CMAKE_CURRENT_SOURCE_DIR}/res/")
 
 include_directories(src)
 
