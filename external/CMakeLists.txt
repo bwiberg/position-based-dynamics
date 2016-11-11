@@ -57,6 +57,12 @@ find_package(Assimp REQUIRED)
 add_subdirectory(soil)
 set(SOIL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/soil/src)
 
+#### ############## ####
+#### #### JSON #### ####
+#### ############## ####
+add_subdirectory(json)
+set(JSON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/json/src)
+
 #### Export libraries and header search paths to CMake parent scope ####
 set(EXTERNAL_LIBRARIES
         ${OpenCL_LIBRARIES}
@@ -76,6 +82,7 @@ set(EXTERNAL_INCLUDE_DIRS
         ${BWGL_EXTRA_INCLUDE_DIRS}
         ${ASSIMP_INCLUDE_DIR}
         ${SOIL_INCLUDE_DIR}
+        ${JSON_INCLUDE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR})
 
 ### Print libraries to CMake output ###

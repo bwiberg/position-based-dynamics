@@ -10,3 +10,6 @@
 [submodule "external/soil"]
 	path = external/soil
 	url = https://github.com/bwiberg/Simple-OpenGL-Image-Library.git
+[submodule "external/json"]
+	path = external/json
+	url = https://github.com/nlohmann/json.git
