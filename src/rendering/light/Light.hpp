@@ -4,57 +4,28 @@
 
 namespace clgl {
     namespace LightType {
-        const std::string AMBIENT       = "ambient";
-        const std::string DIRECTIONAL   = "directional";
-        const std::string POINT         = "point";
+        const std::string DIRECTIONAL = "directional";
+        const std::string POINT = "point";
     }
 
     class Light {
     public:
-        Light(const glm::vec3 &color, float intensity, const std::string &type);
+        const static glm::vec3 DefaultColor;
+
+        Light(const std::string &type,
+                     const glm::vec3 &ambientColor,
+                     const glm::vec3 &diffuseColor,
+                     const glm::vec3 &specularColor);
+
+        void setUniformsInShader(std::shared_ptr<BaseShader> shader);
 
         virtual void setUniformsInShader(std::shared_ptr<BaseShader> shader,
-                                         const std::string &prefix = "") = 0;
+                                         const std::string &prefix) = 0;
 
-        const glm::vec3 &getColor() const;
+        glm::vec3 mAmbientColor;
+        glm::vec3 mDiffuseColor;
+        glm::vec3 mSpecularColor;
 
-        float getIntensity() const;
-
-        const std::string &getType() const;
-
-        void setColor(const glm::vec3 &color);
-
-        void setIntensity(float intensity);
-
-    protected:
-        glm::vec3 mColor;
-
-        float mIntensity;
-
-    private:
         const std::string mType;
     };
-
-    inline Light::Light(const glm::vec3 &color, float intensity, const std::string &type)
-            : mColor(color), mIntensity(intensity), mType(type) {}
-
-    inline const glm::vec3 &Light::getColor() const {
-        return mColor;
-    }
-
-    inline float Light::getIntensity() const {
-        return mIntensity;
-    }
-
-    inline const std::string &Light::getType() const {
-        return mType;
-    }
-
-    inline void Light::setColor(const glm::vec3 &color) {
-        mColor = color;
-    }
-
-    inline void Light::setIntensity(float intensity) {
-        mIntensity = intensity;
-    }
 }

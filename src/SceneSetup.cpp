@@ -23,14 +23,14 @@ pbd::SceneSetup pbd::SceneSetup::LoadFromJsonString(const std::string &str) {
     setup.name = j["name"];
 
     {
-        json camera = j["camera"];
-        setup.camera.position = arrayToVector(camera["position"]);
-        setup.camera.fovY = camera["fovY"];
+        json jcamera = j["camera"];
+        setup.camera.position = arrayToVector(jcamera["position"]);
+        setup.camera.fovY = jcamera["fovY"];
     }
 
     {
-        json shaders = j["shaders"];
-        for (const auto &jshader : shaders) {
+        json jshaders = j["shaders"];
+        for (const auto &jshader : jshaders) {
             ShaderConfig shader;
 
             shader.name = jshader["name"];
@@ -43,8 +43,39 @@ pbd::SceneSetup pbd::SceneSetup::LoadFromJsonString(const std::string &str) {
     }
 
     {
-        json meshes = j["meshes"];
-        for (const auto &jmesh : meshes) {
+        json jlights = j["lights"];
+        for (const auto &jlight : jlights) {
+            ColorConfig color;
+            color.ambient = arrayToVector(jlight["color"]["ambient"]);
+            color.diffuse = arrayToVector(jlight["color"]["diffuse"]);
+            color.specular = arrayToVector(jlight["color"]["specular"]);
+
+            if (jlight["type"] == "DIRECTIONAL") {
+                DirectionalLightConfig light;
+                light.color = color;
+                light.direction = arrayToVector(jlight["direction"]);
+
+                setup.directionalLights.push_back(light);
+            } else if (jlight["type"] == "POINT") {
+                PointLightConfig light;
+                light.color = color;
+                light.position = arrayToVector(jlight["position"]);
+
+                AttenuationConfig att;
+                att.linear = jlight["attenuation"]["linear"];
+                att.quadratic = jlight["attenuation"]["quadratic"];
+                light.attenuation = att;
+
+                setup.pointLights.push_back(light);
+            }
+        }
+        setup.pointLights.shrink_to_fit();
+        setup.directionalLights.shrink_to_fit();
+    }
+
+    {
+        json jmeshes = j["meshes"];
+        for (const auto &jmesh : jmeshes) {
             MeshConfig mesh;
 
             mesh.isCloth = jmesh["isCloth"];

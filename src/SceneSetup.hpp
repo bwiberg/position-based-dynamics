@@ -5,34 +5,60 @@
 #include <glm/glm.hpp>
 
 namespace pbd {
+    struct CameraConfig {
+        glm::vec3 position;
+        float fovY;
+    };
+
+    struct ShaderConfig {
+        std::string name;
+        std::string vertex;
+        std::string fragment;
+    };
+
+    struct ColorConfig {
+        glm::vec3 ambient;
+        glm::vec3 diffuse;
+        glm::vec3 specular;
+    };
+
+    struct AttenuationConfig {
+        float linear;
+        float quadratic;
+    };
+
+    struct DirectionalLightConfig {
+        glm::vec3 direction;
+        ColorConfig color;
+    };
+
+    struct PointLightConfig {
+        glm::vec3 position;
+        ColorConfig color;
+        AttenuationConfig attenuation;
+    };
+
+    struct MeshConfig {
+        bool isCloth;
+        std::string path;
+        std::string shader;
+        glm::vec3 position;
+        glm::vec3 orientation;
+        float scale;
+    };
+
     struct SceneSetup {
         static SceneSetup LoadFromJsonString(const std::string &str);
 
         std::string name;
         std::string filepath;
 
-        struct {
-            glm::vec3 position;
-            float fovY;
-        } camera;
+        CameraConfig camera;
 
-        struct ShaderConfig {
-            std::string name;
-            std::string vertex;
-            std::string fragment;
-        };
+        std::vector<DirectionalLightConfig> directionalLights;
+        std::vector<PointLightConfig> pointLights;
 
         std::vector<ShaderConfig> shaders;
-
-        struct MeshConfig {
-            bool isCloth;
-            std::string path;
-            std::string shader;
-            glm::vec3 position;
-            glm::vec3 orientation;
-            float scale;
-        };
-
         std::vector<MeshConfig> meshes;
     };
 }

@@ -10,17 +10,56 @@
 #include <geometry/MeshLoader.hpp>
 #include <rendering/MeshObject.hpp>
 
+#include <glm/ext.hpp>
+
 namespace pbd {
     ClothSimulationScene::ClothSimulationScene(cl::Context &context, cl::Device &device, cl::CommandQueue &queue)
             : BaseScene(context, device, queue) {
         mCurrentSetupFile = RESOURCEPATH("setups/cloth_sheet.json");
-
-        loadShaders();
-
         createCamera();
-        createLights();
-
         loadKernels();
+
+        {
+            mAxisShader = std::make_shared<clgl::BaseShader>(
+                    std::unordered_map<GLuint, std::string>{{GL_VERTEX_SHADER,   SHADERPATH("axis.vert")},
+                                                            {GL_FRAGMENT_SHADER, SHADERPATH("axis.frag")}});
+            mAxisShader->compile();
+
+            // create axis geometry
+            const glm::vec3 positions[6] = {
+                    glm::vec3(0.0f),
+                    glm::vec3(1.0f, 0.0f, 0.0f),
+                    glm::vec3(0.0f),
+                    glm::vec3(0.0f, 1.0f, 0.0f),
+                    glm::vec3(0.0f),
+                    glm::vec3(0.0f, 0.0f, 1.0f)
+            };
+
+            const glm::vec3 colors[6] = {
+                    glm::vec3(1.0f, 0.0f, 0.0f),
+                    glm::vec3(1.0f, 0.0f, 0.0f),
+                    glm::vec3(0.0f, 1.0f, 0.0f),
+                    glm::vec3(0.0f, 1.0f, 0.0f),
+                    glm::vec3(0.0f, 0.0f, 1.0f),
+                    glm::vec3(0.0f, 0.0f, 1.0f)
+            };
+
+            mAxisPositions = std::make_shared<bwgl::VertexBuffer>(GL_ARRAY_BUFFER);
+            mAxisPositions->bind();
+            mAxisPositions->bufferData(6 * sizeof(glm::vec3), &positions[0]);
+            mAxisPositions->unbind();
+
+            mAxisColors = std::make_shared<bwgl::VertexBuffer>(GL_ARRAY_BUFFER);
+            mAxisColors->bind();
+            mAxisColors->bufferData(6 * sizeof(glm::vec3), &colors[0]);
+            mAxisColors->unbind();
+
+            mAxis = std::make_shared<bwgl::VertexArray>();
+            mAxis->bind();
+            mAxis->addVertexAttribute(*mAxisPositions, 3, GL_FLOAT, GL_FALSE, 0);
+            mAxis->addVertexAttribute(*mAxisColors, 3, GL_FLOAT, GL_FALSE, 0);
+            mAxis->unbind();
+        }
     }
 
     void ClothSimulationScene::addGUI(nanogui::Screen *screen) {
@@ -64,9 +103,10 @@ namespace pbd {
         while (!mSimulationTimes.empty()) mSimulationTimes.pop_back();
         updateTimeLabelsInGUI(0.0);
 
+        mShaders.clear();
         mRenderObjects.clear();
         mClothMeshes.clear();
-        //mLights.clear();
+        mLights.clear();
         loadSetup();
     }
 
@@ -112,22 +152,37 @@ namespace pbd {
 
     void ClothSimulationScene::render() {
         const glm::mat4 VP = mCamera->getPerspectiveTransform() * glm::inverse(mCamera->getTransform());
+        const glm::vec4 WorldEye = mCamera->getParent()->getTransform() * glm::vec4(mCamera->getPosition(), 1.0f);
 
-        for (auto shader : mShaders) {
-            shader.second->use();
+        for (auto shaderpair : mShaders) {
+            auto &shader = shaderpair.second;
+
+            shader->use();
+            shader->uniform("WorldEye", glm::vec3(WorldEye));
+            shader->uniform("shininess", 1.0f);
             for (auto light : mLights) {
-                light->setUniformsInShader(shader.second, light->getType());
+                light->setUniformsInShader(shader);
             }
         }
 
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_FRONT);
+        OGL_CALL(glEnable(GL_DEPTH_TEST));
+        OGL_CALL(glEnable(GL_CULL_FACE));
+        OGL_CALL(glCullFace(GL_FRONT));
         for (auto renderObject : mRenderObjects) {
             renderObject->render(VP);
         }
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_CULL_FACE);
+        OGL_CALL(glDisable(GL_DEPTH_TEST));
+
+        renderAxes();
+    }
+
+    void ClothSimulationScene::renderAxes() {
+        OGL_CALL(glEnable(GL_LINE_SMOOTH));
+        mAxis->bind();
+        mAxisShader->use();
+        mAxisShader->uniform("VP", mCamera->getPerspectiveTransform() * glm::inverse(glm::toMat4(mCameraRotator->getOrientation())));
+        OGL_CALL(glDrawArrays(GL_LINES, 0, 6));
+        mAxis->unbind();
     }
 
     bool ClothSimulationScene::mouseButtonEvent(const glm::ivec2 &p, int button, bool down, int modifiers) {
@@ -164,13 +219,12 @@ namespace pbd {
     }
 
     void ClothSimulationScene::loadShaders() {
-        for (SceneSetup::ShaderConfig config : mCurrentSetup.shaders) {
-            auto shader = std::make_shared<clgl::BaseShader>(
-                    std::unordered_map<GLuint, std::string>{{GL_VERTEX_SHADER,   SHADERPATH(config.vertex)},
-                                                            {GL_FRAGMENT_SHADER, SHADERPATH(config.fragment)}});
+        for (auto &shaderpair : mShaders) {
+            auto shader = shaderpair.second;
             shader->compile();
-            mShaders[config.name] = shader;
         }
+
+        mAxisShader->compile();
     }
 
     void ClothSimulationScene::loadKernels() {
@@ -192,9 +246,15 @@ namespace pbd {
         mCamera->setFieldOfViewY(mCurrentSetup.camera.fovY);
         mCamera->setPosition(mCurrentSetup.camera.position);
 
-        loadShaders();
+        for (ShaderConfig config : mCurrentSetup.shaders) {
+            auto shader = std::make_shared<clgl::BaseShader>(
+                    std::unordered_map<GLuint, std::string>{{GL_VERTEX_SHADER,   SHADERPATH(config.vertex)},
+                                                            {GL_FRAGMENT_SHADER, SHADERPATH(config.fragment)}});
+            shader->compile();
+            mShaders[config.name] = shader;
+        }
 
-        for (SceneSetup::MeshConfig meshconfig : mCurrentSetup.meshes) {
+        for (const MeshConfig &meshconfig : mCurrentSetup.meshes) {
             std::shared_ptr<pbd::Mesh> mesh;
 
             if (meshconfig.isCloth) {
@@ -218,6 +278,27 @@ namespace pbd {
 
             mRenderObjects.push_back(meshobject);
         }
+
+        for (const PointLightConfig &config : mCurrentSetup.pointLights) {
+            auto pointLight = std::make_shared<clgl::PointLight>();
+            pointLight->mAmbientColor = config.color.ambient;
+            pointLight->mDiffuseColor = config.color.diffuse;
+            pointLight->mSpecularColor = config.color.specular;
+            pointLight->mAttenuation = clgl::Attenuation(config.attenuation.linear, config.attenuation.quadratic);
+
+            pointLight->setPosition(config.position);
+            mLights.push_back(pointLight);
+        }
+
+        for (const DirectionalLightConfig &config : mCurrentSetup.directionalLights) {
+            auto dirLight = std::make_shared<clgl::DirectionalLight>(
+                    config.color.ambient,
+                    config.color.diffuse,
+                    config.color.specular,
+                    config.direction
+            );
+            mLights.push_back(dirLight);
+        }
     }
 
     void ClothSimulationScene::createCamera() {
@@ -226,18 +307,6 @@ namespace pbd {
         mCamera = std::make_shared<clgl::Camera>(glm::uvec2(100, 100), 75);
         mCamera->setPosition(glm::vec3(0.0f, 0.0f, 10.0f));
         clgl::SceneObject::attach(mCameraRotator, mCamera);
-    }
-
-    void ClothSimulationScene::createLights() {
-        mAmbLight = std::make_shared<clgl::AmbientLight>(glm::vec3(1.0f, 0.4f, 0.1f), 0.2f);
-        mDirLight = std::make_shared<clgl::DirectionalLight>(glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
-        //mPointLight = std::make_shared<clgl::PointLight>(glm::vec3(1.0f, 1.0f, 1.0f), 1.0f);
-        //mPointLight->setAttenuation(clgl::Attenuation(0.1f, 0.1f));
-        //mPointLight->translate(glm::vec3(0.0f, 2.0f, 0.0f));
-
-        mLights.push_back(mAmbLight);
-        mLights.push_back(mDirLight);
-        //mLights.push_back(mPointLight);
     }
 
     void ClothSimulationScene::updateTimeLabelsInGUI(double timeSinceLastUpdate) {

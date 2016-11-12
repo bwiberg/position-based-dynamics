@@ -2,9 +2,10 @@
 
 namespace clgl {
     struct Attenuation {
-        inline Attenuation(float a_ = 0.0f, float b_ = 0.0f) : a(a_), b(b_) {}
+        inline Attenuation(float linear_ = 0.0f, float quadratic_ = 0.0f)
+                : linear(linear_), quadratic(quadratic_) {}
 
-        float a;
-        float b;
+        float linear;
+        float quadratic;
     };
 }

@@ -8,7 +8,6 @@
 #include "rendering/BaseShader.hpp"
 #include "rendering/Camera.hpp"
 #include "rendering/light/DirectionalLight.hpp"
-#include "rendering/light/AmbientLight.hpp"
 #include "rendering/light/PointLight.hpp"
 
 #include <deque>
@@ -41,8 +40,6 @@ namespace pbd {
     private:
         void createCamera();
 
-        void createLights();
-
         void loadShaders();
 
         void loadKernels();
@@ -51,16 +48,19 @@ namespace pbd {
 
         void displayError(const std::string &str = "");
 
+        void renderAxes();
+
+        std::shared_ptr<clgl::BaseShader> mAxisShader;
+        std::shared_ptr<bwgl::VertexBuffer> mAxisPositions;
+        std::shared_ptr<bwgl::VertexBuffer> mAxisColors;
+        std::shared_ptr<bwgl::VertexArray> mAxis;
+
         std::string mCurrentSetupFile;
         SceneSetup mCurrentSetup;
 
         std::shared_ptr<clgl::Camera> mCamera;
 
         std::shared_ptr<clgl::SceneObject> mCameraRotator;
-
-        std::shared_ptr<clgl::DirectionalLight> mDirLight;
-        std::shared_ptr<clgl::AmbientLight> mAmbLight;
-        std::shared_ptr<clgl::PointLight> mPointLight;
 
         std::vector<std::shared_ptr<clgl::Light>> mLights;
         std::vector<std::shared_ptr<clgl::RenderObject>> mRenderObjects;

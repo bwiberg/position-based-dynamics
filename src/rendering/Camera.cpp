@@ -1,3 +1,4 @@
+//#define GLM_FORCE_LEFT_HANDED
 #include <glm/gtc/matrix_transform.hpp>
 #include "Camera.hpp"
 
@@ -33,5 +34,7 @@ namespace clgl {
     void Camera::recalculatePerspectiveTransform() {
         const float aspect = static_cast<float>(mScreenDimensions.x) / mScreenDimensions.y;
         mPerspectiveTransform = glm::perspective(mFovY, aspect, mZNear, mZFar);
+//        mPerspectiveTransform[1][1] = -mPerspectiveTransform[1][1];
+//        mPerspectiveTransform[2][3] = -mPerspectiveTransform[2][3];
     }
 }

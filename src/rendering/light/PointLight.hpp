@@ -9,25 +9,13 @@ namespace clgl {
     /// @author Benjamin Wiberg
     class PointLight : public Light, public SceneObject {
     public:
-        PointLight(const glm::vec3 &color = glm::vec3(1.0f),
-                   float intensity = 1.0f,
+        PointLight(const glm::vec3 &ambientColor = Light::DefaultColor,
+                   const glm::vec3 &diffuseColor = Light::DefaultColor,
+                   const glm::vec3 &specularColor = Light::DefaultColor,
                    const Attenuation &attenuation = Attenuation());
-
-        const Attenuation &getAttenuation() const;
-
-        void setAttenuation(const Attenuation &attenuation);
 
         virtual void setUniformsInShader(std::shared_ptr<BaseShader> shader, const std::string &prefix) override;
 
-    private:
         Attenuation mAttenuation;
     };
-
-    inline const Attenuation &PointLight::getAttenuation() const {
-        return mAttenuation;
-    }
-
-    inline void PointLight::setAttenuation(const Attenuation &attenuation) {
-        mAttenuation = attenuation;
-    }
 }

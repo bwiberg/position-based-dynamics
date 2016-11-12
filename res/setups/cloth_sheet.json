@@ -16,6 +16,30 @@
       "fragment": "simple.frag"
     }
   ],
+  "lights": [
+    {
+      "type": "DIRECTIONAL",
+      "color": {
+        "ambient": [1.0, 0.5, 0.5],
+        "diffuse": [1.0, 0.5, 0.5],
+        "specular": [1.0, 0.5, 0.5]
+      },
+      "direction": [0.0, -1.0, 0.0]
+    },
+    {
+      "type": "POINT",
+      "color": {
+        "ambient": [1.0, 1.0, 1.0],
+        "diffuse": [1.0, 1.0, 1.0],
+        "specular": [1.0, 1.0, 1.0]
+      },
+      "position": [2.0, 2.0, 0.0],
+      "attenuation": {
+        "linear": 0.1,
+        "quadratic": 0.01
+      }
+    }
+  ],
   "meshes": [
     {
       "isCloth": true,

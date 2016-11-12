@@ -1,17 +1,20 @@
 #include "PointLight.hpp"
 
 namespace clgl {
-    PointLight::PointLight(const glm::vec3 &color, float intensity, const Attenuation &attenuation)
-            : Light(color, intensity, LightType::POINT),
+    PointLight::PointLight(const glm::vec3 &ambientColor,
+                           const glm::vec3 &diffuseColor,
+                           const glm::vec3 &specularColor,
+                           const Attenuation &attenuation)
+            : Light(LightType::POINT, mAmbientColor, mDiffuseColor, mSpecularColor),
               mAttenuation(attenuation) {}
 
     void PointLight::setUniformsInShader(std::shared_ptr<BaseShader> shader, const std::string &prefix) {
-        glm::vec4 transformedLightPosition = getTransform() * glm::vec4(getPosition(), 1.0f);
+        Light::setUniformsInShader(shader, prefix);
 
-        shader->uniform(prefix + ".color", mColor);
-        shader->uniform(prefix + ".intensity", mIntensity);
+        shader->uniform(prefix + ".att.linear", mAttenuation.linear);
+        shader->uniform(prefix + ".att.quadratic", mAttenuation.quadratic);
+
+        const glm::vec4 transformedLightPosition = getTransform() * glm::vec4(getPosition(), 1.0f);
         shader->uniform(prefix + ".position", transformedLightPosition);
-        shader->uniform(prefix + ".att.a", mAttenuation.a);
-        shader->uniform(prefix + ".att.b", mAttenuation.b);
     }
 }
