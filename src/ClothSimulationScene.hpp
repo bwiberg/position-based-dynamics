@@ -37,6 +37,8 @@ namespace pbd {
 
         virtual bool keyboardEvent(int key, int scancode, int action, int modifiers) override;
 
+        virtual bool scrollEvent(const glm::ivec2 &p, const glm::vec2 &rel) override;
+
     private:
         void createCamera();
 
@@ -72,6 +74,10 @@ namespace pbd {
         bool mIsRotatingCamera;
 
         std::vector<cl::Memory> mMemObjects;
+
+        std::unique_ptr<cl::Program> mPredictPositionsProgram;
+        std::unique_ptr<cl::Kernel> mPredictPositions;
+        std::unique_ptr<cl::Kernel> mSetPositionsToPredicted;
 
         /// FPS
 

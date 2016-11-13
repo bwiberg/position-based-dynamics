@@ -25,11 +25,9 @@ namespace pbd {
      * with OpenCL's cl_float3, which * are 4-component
      * vectors.
      */
-    struct ATTR_PACKED Vertex {
+    struct Vertex {
         glm::vec3 position;
-        float __padding0;
         glm::vec3 normal;
-        float __padding1;
         glm::vec2 texCoord;
         glm::vec4 color;
     };

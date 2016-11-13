@@ -127,6 +127,7 @@ namespace pbd {
         bwgl::VertexBuffer mVertexVelocitiesBuffer;
         cl::BufferGL mVertexVelocitiesBufferCL;
 
+        cl::Buffer mVertexPredictedPositionsBufferCL;
         cl::Buffer mTriangleClothBufferCL;
     };
 }

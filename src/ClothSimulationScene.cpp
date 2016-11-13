@@ -10,6 +10,8 @@
 #include <geometry/MeshLoader.hpp>
 #include <rendering/MeshObject.hpp>
 
+#include <util/cl_util.hpp>
+
 #include <glm/ext.hpp>
 
 namespace pbd {
@@ -103,6 +105,7 @@ namespace pbd {
         while (!mSimulationTimes.empty()) mSimulationTimes.pop_back();
         updateTimeLabelsInGUI(0.0);
 
+        mMemObjects.clear();
         mShaders.clear();
         mRenderObjects.clear();
         mClothMeshes.clear();
@@ -133,8 +136,28 @@ namespace pbd {
         /// Update simulation
         /// ...
         /// ...
+        for (auto clothmesh : mClothMeshes) {
+            OCL_CALL(mPredictPositions->setArg(0, clothmesh->mVertexClothBufferCL));
+            OCL_CALL(mPredictPositions->setArg(1, clothmesh->mVertexPredictedPositionsBufferCL));
+            OCL_CALL(mPredictPositions->setArg(2, clothmesh->mVertexVelocitiesBufferCL));
+            OCL_CALL(mPredictPositions->setArg(3, clothmesh->mVertexBufferCL));
+            OCL_CALL(mPredictPositions->setArg(4, 0.01f));
 
+            OCL_CALL(mQueue.enqueueNDRangeKernel(*mPredictPositions,
+                                                 cl::NullRange,
+                                                 cl::NDRange(clothmesh->numVertices()),
+                                                 cl::NullRange));
+        }
 
+        for (auto clothmesh : mClothMeshes) {
+            OCL_CALL(mSetPositionsToPredicted->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
+            OCL_CALL(mSetPositionsToPredicted->setArg(1, clothmesh->mVertexBufferCL));
+
+            OCL_CALL(mQueue.enqueueNDRangeKernel(*mSetPositionsToPredicted,
+                                                 cl::NullRange,
+                                                 cl::NDRange(clothmesh->numVertices() / 2),
+                                                 cl::NullRange));
+        }
 
         OCL_CALL(mQueue.enqueueReleaseGLObjects(&mMemObjects, NULL, &event));
         OCL_CALL(event.wait());
@@ -210,6 +233,11 @@ namespace pbd {
         return false;
     }
 
+    bool ClothSimulationScene::scrollEvent(const glm::ivec2 &p, const glm::vec2 &rel) {
+        const float y = rel.y;
+        mCamera->translate(glm::vec3(0.0f, 0.0f, y));
+    }
+
     bool ClothSimulationScene::resizeEvent(const glm::ivec2 &p) {
         mCamera->setScreenDimensions(glm::uvec2(static_cast<unsigned int>(p.x),
                                                 static_cast<unsigned int>(p.y)));
@@ -230,7 +258,15 @@ namespace pbd {
     }
 
     void ClothSimulationScene::loadKernels() {
+        OCL_ERROR;
 
+        mPredictPositionsProgram = util::LoadCLProgram("predict_positions.cl", mContext, mDevice);
+        OCL_CHECK(mPredictPositions = util::make_unique<cl::Kernel>(*mPredictPositionsProgram,
+                                                                    "predict_positions",
+                                                                    CL_ERROR));
+        OCL_CHECK(mSetPositionsToPredicted = util::make_unique<cl::Kernel>(*mPredictPositionsProgram,
+                                                                           "set_positions_to_predicted",
+                                                                           CL_ERROR));
     }
 
     void ClothSimulationScene::loadSetup() {
@@ -257,10 +293,11 @@ namespace pbd {
         }
 
         for (const MeshConfig &meshconfig : mCurrentSetup.meshes) {
-            std::shared_ptr<pbd::Mesh> mesh;
+            std::shared_ptr<pbd::Mesh> mesh = nullptr;
+            std::shared_ptr<ClothMesh> cloth = nullptr;
 
             if (meshconfig.isCloth) {
-                auto cloth = MeshLoader::LoadClothMesh(RESOURCEPATH(meshconfig.path));
+                cloth = MeshLoader::LoadClothMesh(RESOURCEPATH(meshconfig.path));
                 mClothMeshes.push_back(cloth);
                 mesh = cloth;
             } else {
@@ -270,6 +307,15 @@ namespace pbd {
             mesh->uploadHostData();
             mesh->generateBuffersCL(mContext);
             mesh->clearHostData();
+
+            {
+                mMemObjects.push_back(mesh->mVertexBufferCL);
+                mMemObjects.push_back(mesh->mTriangleBufferCL);
+                if (cloth) {
+                    mMemObjects.push_back(cloth->mVertexClothBufferCL);
+                    mMemObjects.push_back(cloth->mVertexVelocitiesBufferCL);
+                }
+            }
 
             auto shader = mShaders[meshconfig.shader];
 
