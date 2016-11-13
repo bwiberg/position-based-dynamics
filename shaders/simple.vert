@@ -23,7 +23,7 @@ void main() {
     TexCoord = texCoord;
     Color = color;
 
-    vec4 Position = vec4(position.x, position.y, position.z, 1.0);
+    vec4 Position = vec4(position.x, -position.y, position.z, 1.0);
 
     WorldPosition   = M * Position;
 	gl_Position     = MVP * Position;

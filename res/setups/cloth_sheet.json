@@ -45,7 +45,7 @@
       "isCloth": true,
       "path": "models/carpet.obj",
       "shader": "simple",
-      "position": [0.0, -2.0, 0.0],
+      "position": [0.0, 2.0, 0.0],
       "orientation": [1.57, 3.14, 0.0],
       "scale": 2.0
     },

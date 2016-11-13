@@ -10,6 +10,7 @@ namespace pbd {
             : Mesh(std::move(vertices), std::move(triangles), GL_DYNAMIC_DRAW),
               mVertexClothBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
               mVertexVelocitiesBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
+              mVertexPredictedPositionsBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
               mVertexClothData(clothVertexData),
               mTriangleClothData(clothTriangleData) {}
 
@@ -39,14 +40,20 @@ namespace pbd {
         OGL_CALL(glVertexAttribPointer(VertexAttributes::MASS, 1, GL_FLOAT, GL_FALSE, sizeof(ClothVertexData),
                                        (GLvoid *) offsetof(ClothVertexData, mass)));
 
+        std::vector<glm::vec4> velocities;
+        velocities.resize(numVertices());
+        std::fill(velocities.begin(), velocities.end(), glm::vec4(0.0f));
         mVertexVelocitiesBuffer.bind();
-        mVertexVelocitiesBuffer.bufferData(numVertices() * sizeof(glm::vec4), 0);
+        mVertexVelocitiesBuffer.bufferData(numVertices() * sizeof(glm::vec4), velocities.data());
 
         OGL_CALL(glEnableVertexAttribArray(VertexAttributes::VELOCITY));
-        OGL_CALL(glVertexAttribPointer(VertexAttributes::VELOCITY, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec3),
+        OGL_CALL(glVertexAttribPointer(VertexAttributes::VELOCITY, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4),
                                        (GLvoid *) 0));
 
         mVAO.unbind();
+
+        mVertexPredictedPositionsBuffer.bind();
+        mVertexPredictedPositionsBuffer.bufferData(numVertices() * sizeof(glm::vec4), velocities.data());
     }
 
     void ClothMesh::generateBuffersCL(cl::Context &context) {
@@ -54,12 +61,11 @@ namespace pbd {
         OCL_ERROR;
 
         OCL_CHECK(mVertexClothBufferCL = cl::BufferGL(context, CL_MEM_READ_ONLY, mVertexClothBuffer.ID()));
-        OCL_CHECK(mVertexVelocitiesBufferCL = cl::BufferGL(context, CL_MEM_READ_ONLY, mVertexVelocitiesBuffer.ID()));
+        OCL_CHECK(mVertexVelocitiesBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE, mVertexVelocitiesBuffer.ID()));
         OCL_CHECK(mTriangleClothBufferCL = cl::Buffer(context, CL_MEM_READ_ONLY,
                                                       sizeof(ClothTriangleData) * numTriangles()));
-        OCL_CHECK(mVertexPredictedPositionsBufferCL = cl::Buffer(context, CL_MEM_READ_ONLY,
-                                                                 sizeof(cl_float3) * numVertices()));
-
+        OCL_CHECK(mVertexPredictedPositionsBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE,
+                                                                   mVertexPredictedPositionsBuffer.ID()));
     }
 
     void ClothMesh::clearHostData() {

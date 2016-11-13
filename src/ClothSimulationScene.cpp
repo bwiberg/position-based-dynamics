@@ -137,11 +137,10 @@ namespace pbd {
         /// ...
         /// ...
         for (auto clothmesh : mClothMeshes) {
-            OCL_CALL(mPredictPositions->setArg(0, clothmesh->mVertexClothBufferCL));
-            OCL_CALL(mPredictPositions->setArg(1, clothmesh->mVertexPredictedPositionsBufferCL));
-            OCL_CALL(mPredictPositions->setArg(2, clothmesh->mVertexVelocitiesBufferCL));
-            OCL_CALL(mPredictPositions->setArg(3, clothmesh->mVertexBufferCL));
-            OCL_CALL(mPredictPositions->setArg(4, 0.01f));
+            OCL_CALL(mPredictPositions->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
+            OCL_CALL(mPredictPositions->setArg(1, clothmesh->mVertexVelocitiesBufferCL));
+            OCL_CALL(mPredictPositions->setArg(2, clothmesh->mVertexBufferCL));
+            OCL_CALL(mPredictPositions->setArg(3, 0.01f));
 
             OCL_CALL(mQueue.enqueueNDRangeKernel(*mPredictPositions,
                                                  cl::NullRange,
@@ -155,7 +154,7 @@ namespace pbd {
 
             OCL_CALL(mQueue.enqueueNDRangeKernel(*mSetPositionsToPredicted,
                                                  cl::NullRange,
-                                                 cl::NDRange(clothmesh->numVertices() / 2),
+                                                 cl::NDRange(clothmesh->numVertices()),
                                                  cl::NullRange));
         }
 
@@ -299,6 +298,22 @@ namespace pbd {
             if (meshconfig.isCloth) {
                 cloth = MeshLoader::LoadClothMesh(RESOURCEPATH(meshconfig.path));
                 mClothMeshes.push_back(cloth);
+
+                // pre-process each vertex with its transform matrix
+                const glm::mat4 rotation = glm::toMat4(glm::quat(meshconfig.orientation));
+                const glm::mat4 translation = glm::translate(glm::mat4(1.0f), meshconfig.position);
+                const glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(meshconfig.scale));
+
+                const glm::mat4 transform = translation * rotation * scale;
+                const glm::mat3 normalTransform(transform);
+
+                for (auto &vertex : cloth->mVertices) {
+                    glm::vec4 position = glm::vec4(vertex.position, 1.0f);
+                    position = transform * position;
+                    vertex.position = glm::vec3(position);
+                    vertex.normal = normalTransform * vertex.normal;
+                }
+
                 mesh = cloth;
             } else {
                 mesh = MeshLoader::LoadMesh(RESOURCEPATH(meshconfig.path));
@@ -320,9 +335,11 @@ namespace pbd {
             auto shader = mShaders[meshconfig.shader];
 
             auto meshobject = std::make_shared<clgl::MeshObject>(mesh, shader);
-            meshobject->setScale(meshconfig.scale);
-            meshobject->setEulerAngles(meshconfig.orientation);
-            meshobject->setPosition(meshconfig.position);
+            if (!cloth) {
+                meshobject->setScale(meshconfig.scale);
+                meshobject->setEulerAngles(meshconfig.orientation);
+                meshobject->setPosition(meshconfig.position);
+            }
 
             mRenderObjects.push_back(meshobject);
         }

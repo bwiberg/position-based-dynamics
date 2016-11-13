@@ -26,27 +26,23 @@ typedef struct def_ClothVertexData {
 
 #define ID get_global_id(0)
 
-__kernel void predict_positions(__global const ClothVertexData  *clothVertexData,
-                                __global float3                 *predictedPositions,
-                                __global float3                 *velocities,
-                                __global Vertex                 *vertices,
-                                const float                     deltaTime) {
-    Vertex vertex = vertices[ID];
+__kernel void predict_positions(__global float3         *predictedPositions, // 0
+                                __global float3         *velocities,         // 1
+                                __global const Vertex   *vertices,           // 2
+                                const float             deltaTime) {         // 3
+
     float3 velocity = velocities[ID];
     velocity.y = velocity.y - deltaTime * 9.82f;
 
     velocities[ID] = velocity;
-
-    float3 position = float3(vertex.position[0], vertex.position[1], vertex.position[2]);
-
-    predictedPositions[ID] = position + deltaTime * velocity;
+    predictedPositions[ID].x = vertices[ID].position[0] + deltaTime * velocity.x;
+    predictedPositions[ID].y = vertices[ID].position[1] + deltaTime * velocity.y;
+    predictedPositions[ID].z = vertices[ID].position[2] + deltaTime * velocity.z;
 }
 
 __kernel void set_positions_to_predicted(__global const float3  *predictedPositions,
                                          __global Vertex        *vertices) {
-    //vertices[ID].position = predictedPositions[ID];
-    //vertices[ID].data[1] = 1.0f;
     vertices[ID].position[0] = predictedPositions[ID].x;
     vertices[ID].position[1] = predictedPositions[ID].y;
-    //vertices[ID].data[2] = predictedPositions[ID].z;
+    vertices[ID].position[2] = predictedPositions[ID].z;
 }
