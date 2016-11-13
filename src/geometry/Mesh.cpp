@@ -174,4 +174,10 @@ namespace pbd {
         mVertexClothData.clear();
         mTriangleClothData.clear();
     }
+
+    void ClothMesh::render(clgl::BaseShader &shader, const glm::mat4 &VP, const glm::mat4 &M) {
+        OGL_CALL(glDisable(GL_CULL_FACE));
+        Mesh::render(shader, VP, M);
+        OGL_CALL(glEnable(GL_CULL_FACE));
+    }
 }

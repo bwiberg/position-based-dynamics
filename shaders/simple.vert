@@ -7,6 +7,7 @@ layout (location = 3) in vec4 color;
 
 uniform mat4 M;
 uniform mat4 MVP;
+uniform vec3 WorldEye;
 
 out vec4 WorldPosition;
 out vec3 Normal;
@@ -14,7 +15,11 @@ out vec2 TexCoord;
 out vec4 Color;
 
 void main() {
-    Normal = vec3(normal);
+    Normal = mat3(M) * vec3(normal);
+    if (dot(Normal, WorldEye) < 0) {
+        Normal = -Normal;
+    }
+
     TexCoord = texCoord;
     Color = color;
 

@@ -29,14 +29,14 @@
     {
       "type": "POINT",
       "color": {
-        "ambient": [1.0, 1.0, 1.0],
+        "ambient": [0.5, 0.5, 0.5],
         "diffuse": [1.0, 1.0, 1.0],
         "specular": [1.0, 1.0, 1.0]
       },
-      "position": [2.0, 2.0, 0.0],
+      "position": [2.0, 2.0, 2.0],
       "attenuation": {
-        "linear": 0.1,
-        "quadratic": 0.01
+        "linear": 0.05,
+        "quadratic":0.005
       }
     }
   ],

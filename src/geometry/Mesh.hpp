@@ -28,7 +28,7 @@ namespace pbd {
              std::vector<Triangle>  && triangles,
              GLenum usage = GL_STATIC_DRAW);
 
-        /**
+        virtual /**
          * Renders the mesh with the provided shader.
          * @param shader The shader
          * @param VP The view-projection matrix to use in rendering
@@ -115,6 +115,8 @@ namespace pbd {
         virtual void clearHostData() override;
 
         virtual void generateBuffersCL(cl::Context &context) override;
+
+        virtual void render(clgl::BaseShader &shader, const glm::mat4 &VP, const glm::mat4 &M) override;
 
         std::vector<ClothVertexData>    mVertexClothData;
         std::vector<ClothTriangleData>  mTriangleClothData;
