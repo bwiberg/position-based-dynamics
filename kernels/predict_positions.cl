@@ -26,6 +26,16 @@ typedef struct def_ClothVertexData {
 
 #define ID get_global_id(0)
 
+inline float3 Float3(float x, float y, float z) {
+    float3 vec;
+    vec.x = x;
+    vec.y = y;
+    vec.z = z;
+    return vec;
+}
+
+#define POSITION(vertex) Float3(vertex.position[0], vertex.position[1], vertex.position[2])
+
 __kernel void predict_positions(__global float3         *predictedPositions, // 0
                                 __global float3         *velocities,         // 1
                                 __global const Vertex   *vertices,           // 2
@@ -33,11 +43,12 @@ __kernel void predict_positions(__global float3         *predictedPositions, // 
 
     float3 velocity = velocities[ID];
     velocity.y = velocity.y - deltaTime * 9.82f;
-
     velocities[ID] = velocity;
-    predictedPositions[ID].x = vertices[ID].position[0] + deltaTime * velocity.x;
-    predictedPositions[ID].y = vertices[ID].position[1] + deltaTime * velocity.y;
-    predictedPositions[ID].z = vertices[ID].position[2] + deltaTime * velocity.z;
+
+    float3 position = POSITION(vertices[ID]);
+    position = position + deltaTime * velocity;
+
+    predictedPositions[ID] = position;
 }
 
 __kernel void set_positions_to_predicted(__global const float3  *predictedPositions,
