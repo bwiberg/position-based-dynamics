@@ -29,12 +29,13 @@ namespace clgl {
     void Camera::setClipPlanes(float zNear, float zFar) {
         mZNear = zNear;
         mZFar = zFar;
+        recalculatePerspectiveTransform();
     }
 
     void Camera::recalculatePerspectiveTransform() {
         const float aspect = static_cast<float>(mScreenDimensions.x) / mScreenDimensions.y;
         mPerspectiveTransform = glm::perspective(mFovY, aspect, mZNear, mZFar);
-//        mPerspectiveTransform[1][1] = -mPerspectiveTransform[1][1];
+//        mPerspectiveTransform[2][2] = -mPerspectiveTransform[2][2];
 //        mPerspectiveTransform[2][3] = -mPerspectiveTransform[2][3];
     }
 }

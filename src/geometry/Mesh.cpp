@@ -8,7 +8,11 @@ namespace pbd {
               mTriangleBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_STATIC_DRAW),
               mVertices(vertices),
               mTriangles(triangles),
-              mHasUploadedHostData(false) {}
+              mHasUploadedHostData(false) {
+        mTexDiffuse.ID = 0;
+        mTexSpecular.ID = 0;
+        mTexBump.ID = 0;
+    }
 
 
     void Mesh::render(clgl::BaseShader &shader, const glm::mat4 &VP, const glm::mat4 &M) {
@@ -16,6 +20,27 @@ namespace pbd {
         shader.uniform("VP", VP);
         shader.uniform("MVP", VP * M);
         shader.uniform("M", M);
+
+        shader.uniform("HasDiffuseTexture", static_cast<int>(mTexDiffuse.ID != 0));
+        if (mTexDiffuse.ID != 0) {
+            shader.uniform("diffuseTexture", static_cast<int>(Texture::Type::DIFFUSE));
+            OGL_CALL(glActiveTexture(GL_TEXTURE0 + Texture::Type::DIFFUSE));
+            OGL_CALL(glBindTexture(GL_TEXTURE_2D, mTexDiffuse.ID));
+        }
+
+        shader.uniform("HasSpecularTexture", static_cast<int>(mTexSpecular.ID != 0));
+        if (mTexSpecular.ID != 0) {
+            shader.uniform("specularTexture", static_cast<int>(Texture::Type::SPECULAR));
+            OGL_CALL(glActiveTexture(GL_TEXTURE0 + Texture::Type::SPECULAR));
+            OGL_CALL(glBindTexture(GL_TEXTURE_2D, mTexSpecular.ID));
+        }
+
+        shader.uniform("HasBumpTexture", static_cast<int>(mTexBump.ID != 0));
+        if (mTexBump.ID != 0) {
+            shader.uniform("bumpTexture", static_cast<int>(Texture::Type::BUMP));
+            OGL_CALL(glActiveTexture(GL_TEXTURE0 + Texture::Type::BUMP));
+            OGL_CALL(glBindTexture(GL_TEXTURE_2D, mTexBump.ID));
+        }
 
         mVAO.bind();
         OGL_CALL(glDrawElements(GL_TRIANGLES, 3 * static_cast<GLsizei>(numTriangles()), GL_UNSIGNED_INT, 0));
@@ -104,7 +129,11 @@ namespace pbd {
             : ClothMesh(std::move(mesh.mVertices),
                         std::move(clothVertexData),
                         std::move(mesh.mTriangles),
-                        std::move(clothTriangleData)) {}
+                        std::move(clothTriangleData)) {
+        mTexDiffuse = mesh.mTexDiffuse;
+        mTexSpecular = mesh.mTexSpecular;
+        mTexBump = mesh.mTexBump;
+    }
 
     void ClothMesh::uploadHostData() {
         if (mHasUploadedHostData) return;

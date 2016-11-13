@@ -5,6 +5,7 @@
 typedef struct def_ClothVertexData {
     uint vertexID; // don't know if this is needed
     float mass;
+    float invmass;
 } ClothVertexData;
 
 /**
@@ -14,6 +15,7 @@ typedef struct def_ClothVertexData {
 typedef struct def_ClothTriangleData {
     uint triangleID; // don't know if this is needed
     int neighbourIDs[3];
+    float mass;
 } ClothTriangleData;
 
 /**

@@ -1,5 +1,6 @@
 #include "MeshLoader.hpp"
 #include <util/math_util.hpp>
+#include <util/paths.hpp>
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -29,7 +30,7 @@ namespace pbd {
             return glm::vec2(vec.x, vec.y);
         }
 
-        Texture LoadTextureFromFile(const std::string path, const std::string &type) {
+        Texture LoadTextureFromFile(const std::string path, const Texture::Type type) {
             // Check if texture is loaded already
             auto iter = std::find_if(LoadedTextures.cbegin(), LoadedTextures.cend(),
                                      [path](const Texture &loadedTexture) {
@@ -41,12 +42,17 @@ namespace pbd {
             }
 
             Texture texture;
+            const std::string fullpath = RESOURCEPATH("models/" + path);
             texture.ID = SOIL_load_OGL_texture(
-                    path.c_str(),
+                    fullpath.c_str(),
                     SOIL_LOAD_AUTO,
                     SOIL_CREATE_NEW_ID,
                     SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
             );
+            if (texture.ID == 0) {
+                std::cerr << "SOIL loading error: " << SOIL_last_result() << std::endl;
+            }
+
             texture.path = path;
             texture.type = type;
 
@@ -190,22 +196,20 @@ namespace pbd {
             auto mesh = std::make_shared<Mesh>(std::move(vertices), std::move(triangles));
 
             aiMaterial *material = scene->mMaterials[aimesh->mMaterialIndex];
+            aiString texturePath;
             if (material->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
-                aiString texturePath;
                 material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
-                mesh->mTexDiffuse = LoadTextureFromFile(texturePath.C_Str(), "diffuse");
+                mesh->mTexDiffuse = LoadTextureFromFile(texturePath.C_Str(), Texture::Type::DIFFUSE);
             }
 
             if (material->GetTextureCount(aiTextureType_SPECULAR) > 0) {
-                aiString texturePath;
                 material->GetTexture(aiTextureType_SPECULAR, 0, &texturePath);
-                mesh->mTexSpecular = LoadTextureFromFile(texturePath.C_Str(), "specular");
+                mesh->mTexSpecular = LoadTextureFromFile(texturePath.C_Str(), Texture::Type::SPECULAR);
             }
 
-            if (material->GetTextureCount(aiTextureType_NORMALS) > 0) {
-                aiString texturePath;
-                material->GetTexture(aiTextureType_NORMALS, 0, &texturePath);
-                mesh->mTexNormal = LoadTextureFromFile(texturePath.C_Str(), "normal");
+            if (material->GetTextureCount(aiTextureType_HEIGHT) > 0) {
+                material->GetTexture(aiTextureType_HEIGHT, 0, &texturePath);
+                mesh->mTexBump = LoadTextureFromFile(texturePath.C_Str(), Texture::Type::BUMP);
             }
 
             importer.FreeScene();

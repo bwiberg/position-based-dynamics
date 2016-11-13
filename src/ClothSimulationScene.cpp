@@ -134,6 +134,8 @@ namespace pbd {
         /// ...
         /// ...
 
+
+
         OCL_CALL(mQueue.enqueueReleaseGLObjects(&mMemObjects, NULL, &event));
         OCL_CALL(event.wait());
 

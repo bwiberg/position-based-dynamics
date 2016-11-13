@@ -5,8 +5,14 @@
 
 namespace pbd {
     struct Texture {
+        enum Type {
+            DIFFUSE = 0,
+            SPECULAR,
+            BUMP
+        };
+
         GLuint ID;
-        std::string type;
+        Type type;
         std::string path;
     };
 }

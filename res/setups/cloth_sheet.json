@@ -43,10 +43,10 @@
   "meshes": [
     {
       "isCloth": true,
-      "path": "models/cube.obj",
+      "path": "models/carpet.obj",
       "shader": "simple",
-      "position": [0.0, 0.0, 0.0],
-      "orientation": [3.14159, 0.0, 0.0],
+      "position": [0.0, -2.0, 0.0],
+      "orientation": [1.57, 3.14, 0.0],
       "scale": 2.0
     },
     {

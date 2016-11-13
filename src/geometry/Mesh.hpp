@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <geometry/geometry.hpp>
+#include <simulation/geometry.hpp>
 #include <bwgl/bwgl.hpp>
 #include <nanogui/opengl.h>
 
@@ -76,7 +77,7 @@ namespace pbd {
 
         Texture mTexDiffuse;
         Texture mTexSpecular;
-        Texture mTexNormal;
+        Texture mTexBump;
 
         bwgl::VertexArray mVAO;
 
