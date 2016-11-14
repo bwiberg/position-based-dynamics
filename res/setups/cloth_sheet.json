@@ -50,6 +50,14 @@
       "scale": 2.0
     },
     {
+      "isCloth": true,
+      "path": "models/sphere.obj",
+      "shader": "simple",
+      "position": [2.0, 2.0, 3.0],
+      "orientation": [0.0, 0.0, 0.0],
+      "scale": 1.0
+    },
+    {
       "isCloth": false,
       "path": "models/plane.obj",
       "shader": "checkerboard",

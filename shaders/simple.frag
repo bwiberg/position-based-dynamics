@@ -86,7 +86,7 @@ vec3 calcPointColor(vec3 normal, vec3 matDiffuse, vec3 matSpecular) {
 
     vec3 ambient = point.ambient * matDiffuse;
     vec3 diffuse = point.diffuse * matDiffuse * NL;
-    vec3 specular = 2 * point.specular * matSpecular * pow(RE, 100*shininess);
+    vec3 specular = 2 * point.specular * matSpecular * pow(RE, 40*shininess);
 
     vec3 c = ambient + diffuse + specular;
 
@@ -104,4 +104,5 @@ void main() {
     vec3 total = /*calcDirColor(normal) +*/ calcPointColor(normal, matDiffuse, matSpecular);
 
     color = vec4(total, 1.0);
+    //color = vec4(matDiffuse, 1);
 }

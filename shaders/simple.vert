@@ -16,9 +16,6 @@ out vec4 Color;
 
 void main() {
     Normal = mat3(M) * vec3(normal);
-    if (dot(Normal, WorldEye) < 0) {
-        Normal = -Normal;
-    }
 
     TexCoord = texCoord;
     Color = color;
