@@ -130,5 +130,7 @@ namespace pbd {
         bwgl::VertexBuffer mVertexPredictedPositionsBuffer;
         cl::BufferGL mVertexPredictedPositionsBufferCL;
         cl::Buffer mTriangleClothBufferCL;
+        cl::Buffer mVertexInBinPosCL;
+
     };
 }

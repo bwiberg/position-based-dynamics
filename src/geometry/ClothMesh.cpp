@@ -66,6 +66,9 @@ namespace pbd {
                                                       sizeof(ClothTriangleData) * numTriangles()));
         OCL_CHECK(mVertexPredictedPositionsBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE,
                                                                    mVertexPredictedPositionsBuffer.ID()));
+        OCL_CHECK(mVertexInBinPosCL = cl::Buffer(context, CL_MEM_READ_WRITE,
+                                                 sizeof(cl_uint) * numVertices(),
+                                                 (void*)0, CL_ERROR));
     }
 
     void ClothMesh::clearHostData() {
@@ -75,8 +78,8 @@ namespace pbd {
     }
 
     void ClothMesh::render(clgl::BaseShader &shader, const glm::mat4 &VP, const glm::mat4 &M) {
-        OGL_CALL(glDisable(GL_CULL_FACE));
+//        OGL_CALL(glDisable(GL_CULL_FACE));
         Mesh::render(shader, VP, M);
-        OGL_CALL(glEnable(GL_CULL_FACE));
+//        OGL_CALL(glEnable(GL_CULL_FACE));
     }
 }

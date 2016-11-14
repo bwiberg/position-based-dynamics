@@ -56,6 +56,10 @@ namespace pbd {
             texture.path = path;
             texture.type = type;
 
+            OGL_CALL(glBindTexture(GL_TEXTURE_2D, texture.ID));
+            OGL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
+            OGL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
+
             LoadedTextures.push_back(texture);
             return texture;
         }

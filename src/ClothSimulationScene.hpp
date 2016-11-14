@@ -14,6 +14,8 @@
 #include <rendering/RenderObject.hpp>
 #include <geometry/Mesh.hpp>
 
+#include <simulation/Grid.hpp>
+
 namespace pbd {
     /// @brief //todo add brief description to FluidScene
     /// @author Benjamin Wiberg
@@ -78,6 +80,10 @@ namespace pbd {
         std::unique_ptr<cl::Program> mPredictPositionsProgram;
         std::unique_ptr<cl::Kernel> mPredictPositions;
         std::unique_ptr<cl::Kernel> mSetPositionsToPredicted;
+
+        std::unique_ptr<pbd::Grid> mGridCL;
+        std::unique_ptr<cl::Buffer> mBinCountCL; // CxCxC-sized uint buffer, containing particle count per cell
+        std::unique_ptr<cl::Buffer> mBinStartIDCL;
 
         /// FPS
 

@@ -62,6 +62,23 @@ namespace pbd {
             mAxis->addVertexAttribute(*mAxisColors, 3, GL_FLOAT, GL_FALSE, 0);
             mAxis->unbind();
         }
+
+        mGridCL = util::make_unique<pbd::Grid>();
+        mGridCL->halfDimensions = {1.0f, 1.0f, 1.0f, 0.0f};
+        mGridCL->binSize = 0.1f;
+        mGridCL->binCount3D = {16, 20, 20, 0};
+        mGridCL->binCount = 16 * 20 * 20;
+
+        OCL_ERROR;
+
+        OCL_CHECK(mBinCountCL = util::make_unique<cl::Buffer>(mContext,
+                                                              CL_MEM_READ_WRITE,
+                                                              sizeof(cl_uint) * mGridCL->binCount,
+                                                              (void*)0, CL_ERROR));
+        OCL_CHECK(mBinStartIDCL = util::make_unique<cl::Buffer>(mContext,
+                                                                CL_MEM_READ_WRITE,
+                                                                sizeof(cl_uint) * mGridCL->binCount,
+                                                                (void*)0, CL_ERROR));
     }
 
     void ClothSimulationScene::addGUI(nanogui::Screen *screen) {
@@ -221,8 +238,8 @@ namespace pbd {
     bool ClothSimulationScene::mouseMotionEvent(const glm::ivec2 &p, const glm::ivec2 &rel, int button, int modifiers) {
         if (mIsRotatingCamera) {
             glm::vec3 eulerAngles = mCameraRotator->getEulerAngles();
-            eulerAngles.x += 0.05f * rel.y;
-            eulerAngles.y += 0.05f * rel.x;
+            eulerAngles.x += 0.02f * rel.y;
+            eulerAngles.y += 0.02f * rel.x;
             eulerAngles.x = util::clamp(eulerAngles.x, - CL_M_PI_F / 2, CL_M_PI_F / 2);
             mCameraRotator->setEulerAngles(eulerAngles);
 
