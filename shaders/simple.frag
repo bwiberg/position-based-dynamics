@@ -50,9 +50,11 @@ vec3 getSpecularColor() {
 }
 
 vec3 getNormal() {
-    if (HasBumpTexture == 0) return normalize(Normal);
+    vec3 n;
+    if (HasBumpTexture == 0) n = normalize(Normal);
+    n = normalize(Normal);
 
-    return normalize(Normal);
+    return normalize(n);
 }
 
 vec3 calcDirColor(vec3 normal, vec3 matDiffuse, vec3 matSpecular) {
@@ -73,12 +75,14 @@ vec3 calcDirColor(vec3 normal, vec3 matDiffuse, vec3 matSpecular) {
 }
 
 vec3 calcPointColor(vec3 normal, vec3 matDiffuse, vec3 matSpecular) {
-    float dist = length(WorldPosition.xyz - point.position.xyz);
-    vec3 dir = (WorldPosition.xyz - point.position.xyz) / dist;
+    vec3 pointPosition = point.position.xyz;
+    pointPosition.y = -pointPosition.y;
+
+    float dist = length(WorldPosition.xyz - pointPosition);
+    vec3 dir = (WorldPosition.xyz - pointPosition) / dist;
 
     vec3 R = reflect(dir, normal);
     vec3 eye = WorldEye;
-    eye.y = - eye.y;
     vec3 E = normalize(eye - WorldPosition.xyz);
 
     float NL = max(dot(-dir, normal), 0);
@@ -86,7 +90,7 @@ vec3 calcPointColor(vec3 normal, vec3 matDiffuse, vec3 matSpecular) {
 
     vec3 ambient = point.ambient * matDiffuse;
     vec3 diffuse = point.diffuse * matDiffuse * NL;
-    vec3 specular = 2 * point.specular * matSpecular * pow(RE, 40*shininess);
+    vec3 specular = point.specular * matSpecular * pow(RE, 40*shininess);
 
     vec3 c = ambient + diffuse + specular;
 
@@ -100,9 +104,8 @@ void main() {
     vec3 matDiffuse = getDiffuseColor();
     vec3 matSpecular = getSpecularColor();
 
-    vec3 normal = normalize(Normal);
+    vec3 normal = getNormal();
     vec3 total = /*calcDirColor(normal) +*/ calcPointColor(normal, matDiffuse, matSpecular);
 
     color = vec4(total, 1.0);
-    //color = vec4(matDiffuse, 1);
 }

@@ -84,6 +84,7 @@ pbd::SceneSetup pbd::SceneSetup::LoadFromJsonString(const std::string &str) {
             mesh.position = arrayToVector(jmesh["position"]);
             mesh.orientation = arrayToVector(jmesh["orientation"]);
             mesh.scale = jmesh["scale"];
+            mesh.flipNormals = jmesh["flipNormals"];
 
             setup.meshes.push_back(mesh);
         }

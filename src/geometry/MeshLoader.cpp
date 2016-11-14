@@ -191,8 +191,8 @@ namespace pbd {
                 auto &face = aimesh->mFaces[i];
                 assert(face.mNumIndices == 3); // since we specified aiProcess_Triangulate
                 triangle.vertices.x = face.mIndices[0];
-                triangle.vertices.y = face.mIndices[1];
-                triangle.vertices.z = face.mIndices[2];
+                triangle.vertices.y = face.mIndices[2];
+                triangle.vertices.z = face.mIndices[1];
 
                 triangles[i] = triangle;
             }

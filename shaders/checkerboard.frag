@@ -89,7 +89,7 @@ vec3 calcPointColor(vec3 normal, vec3 matDiffuse, vec3 matSpecular) {
 
     vec3 R = reflect(dir, normal);
     vec3 eye = WorldEye;
-    eye.y = - eye.y;
+    eye.y = -eye.y;
     vec3 E = normalize(eye - WorldPosition.xyz);
 
     float NL = max(dot(-dir, normal), 0);
@@ -97,7 +97,7 @@ vec3 calcPointColor(vec3 normal, vec3 matDiffuse, vec3 matSpecular) {
 
     vec3 ambient = point.ambient * matDiffuse;
     vec3 diffuse = point.diffuse * matDiffuse * NL;
-    vec3 specular = 2 * point.specular * matSpecular * pow(RE, 100*shininess);
+    vec3 specular = point.specular * matSpecular * pow(RE, 100*shininess);
 
     vec3 c = ambient + diffuse + specular;
 
@@ -111,7 +111,7 @@ void main() {
     vec3 matDiffuse = calcChecker() * getDiffuseColor();
     vec3 matSpecular = calcChecker() * getSpecularColor();
 
-    vec3 normal = normalize(Normal);
+    vec3 normal = -normalize(Normal);
     vec3 total = /*calcDirColor(normal) +*/ calcPointColor(normal, matDiffuse, matSpecular);
 
     color = vec4(total, 1.0);

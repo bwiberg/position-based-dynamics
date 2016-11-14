@@ -329,6 +329,10 @@ namespace pbd {
                     position = transform * position;
                     vertex.position = glm::vec3(position);
                     vertex.normal = normalTransform * vertex.normal;
+
+                    if (meshconfig.flipNormals) {
+                        vertex.normal = -vertex.normal;
+                    }
                 }
 
                 mesh = cloth;

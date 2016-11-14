@@ -16,6 +16,7 @@ out vec4 Color;
 
 void main() {
     Normal = mat3(M) * vec3(normal);
+    Normal.y = -Normal.y;
 
     TexCoord = texCoord;
     Color = color;

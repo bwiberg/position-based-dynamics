@@ -78,8 +78,16 @@ namespace pbd {
     }
 
     void ClothMesh::render(clgl::BaseShader &shader, const glm::mat4 &VP, const glm::mat4 &M) {
-//        OGL_CALL(glDisable(GL_CULL_FACE));
+        // render front-side of cloth
+        OGL_CALL(glCullFace(GL_BACK));
+        shader.uniform("flipNormals", 0);
         Mesh::render(shader, VP, M);
-//        OGL_CALL(glEnable(GL_CULL_FACE));
+
+        // render back-side of cloth
+        //OGL_CALL(glCullFace(GL_FRONT));
+        //shader.uniform("flipNormals", 1);
+        //Mesh::render(shader, VP, M);
+
+        OGL_CALL(glCullFace(GL_BACK));
     }
 }
