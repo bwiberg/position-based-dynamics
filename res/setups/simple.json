@@ -1,5 +1,5 @@
 {
-  "name": "Cloth sheet",
+  "name": "Simple",
   "camera": {
     "position": [0.0, 0.0, 10.0],
     "fovY": 75
@@ -29,11 +29,11 @@
     {
       "type": "POINT",
       "color": {
-        "ambient": [0.2, 0.2, 0.2],
+        "ambient": [0.5, 0.5, 0.5],
         "diffuse": [1.0, 1.0, 1.0],
         "specular": [1.0, 1.0, 1.0]
       },
-      "position": [0.0, 1.2, 0.4],
+      "position": [2.0, 2.0, 2.0],
       "attenuation": {
         "linear": 0.05,
         "quadratic":0.005
@@ -43,30 +43,19 @@
   "meshes": [
     {
       "isCloth": true,
-      "path": "models/carpet.obj",
+      "path": "models/simple.obj",
       "shader": "simple",
       "position": [0.0, 2.0, 0.0],
       "orientation": [1.57, 3.14, 0.0],
-      "scale": 2.0,
-      "flipNormals": true
-    },
-    {
-      "isCloth": true,
-      "path": "models/sphere.obj",
-      "shader": "simple",
-      "position": [2.0, 2.0, 3.0],
-      "orientation": [2.0, 0.0, 0.0],
-      "scale": 1.0,
-      "flipNormals": false
+      "scale": 2.0
     },
     {
       "isCloth": false,
       "path": "models/plane.obj",
       "shader": "checkerboard",
       "position": [0.0, 0.0, 0.0],
-      "orientation": [0.0, 0.0, 0.0],
-      "scale": 100.0,
-      "flipNormals": false
+      "orientation": [3.14159, 0.0, 0.0],
+      "scale": 100.0
     }
   ]
 }
