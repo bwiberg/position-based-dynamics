@@ -25,6 +25,7 @@ namespace pbd {
          * Constructs a Mesh object with the specified vertices and parameters.
          */
         Mesh(std::vector<Vertex>    && vertices,
+             std::vector<Edge>      && edges,
              std::vector<Triangle>  && triangles,
              GLenum usage = GL_STATIC_DRAW);
 
@@ -63,9 +64,19 @@ namespace pbd {
         virtual void clearHostData();
 
         /**
+         * Gets a vector of all cl::BufferGL memory objects.
+         */
+        virtual std::vector<cl::Memory> getMemoryCL();
+
+        /**
          * Returns the number of vertices in this mesh.
          */
         unsigned long numVertices();
+
+        /**
+         * Returns the number of vertices in this mesh.
+         */
+        unsigned long numEdges();
 
         /**
          * Returns the number of triangles in this mesh.
@@ -73,6 +84,7 @@ namespace pbd {
         unsigned long numTriangles();
 
         std::vector<Vertex> mVertices;
+        std::vector<Edge> mEdges;
         std::vector<Triangle> mTriangles;
 
         Texture mTexDiffuse;
@@ -85,6 +97,10 @@ namespace pbd {
         bwgl::VertexBuffer mVertexBuffer;
         cl::BufferGL mVertexBufferCL;
 
+        // Per-edge data handles for OpenGL and OpenCL
+        bwgl::VertexBuffer mEdgeBuffer;
+        cl::BufferGL mEdgeBufferCL;
+
         // Per-triangle data handles for OpenGL and OpenCL
         bwgl::VertexBuffer mTriangleBuffer;
         cl::BufferGL mTriangleBufferCL;
@@ -92,7 +108,7 @@ namespace pbd {
     protected:
         bool mHasUploadedHostData;
 
-        unsigned long mNumVertices, mNumTriangles;
+        unsigned long mNumVertices, mNumEdges, mNumTriangles;
     };
 
     /**
@@ -103,11 +119,14 @@ namespace pbd {
     public:
         ClothMesh(std::vector<Vertex>               && vertices,
                   std::vector<ClothVertexData>      && clothVertexData,
+                  std::vector<Edge>                 && edges,
+                  std::vector<ClothEdgeData>        && clothEdgeData,
                   std::vector<Triangle>             && triangles,
                   std::vector<ClothTriangleData>    && clothTriangleData);
 
         ClothMesh(Mesh && mesh,
                   std::vector<ClothVertexData>      && clothVertexData,
+                  std::vector<ClothEdgeData>        && clothEdgeData,
                   std::vector<ClothTriangleData>    && clothTriangleData);
 
         virtual void uploadHostData() override;
@@ -116,9 +135,12 @@ namespace pbd {
 
         virtual void generateBuffersCL(cl::Context &context) override;
 
+        virtual std::vector<cl::Memory> getMemoryCL() override;
+
         virtual void render(clgl::BaseShader &shader, const glm::mat4 &VP, const glm::mat4 &M) override;
 
         std::vector<ClothVertexData>    mVertexClothData;
+        std::vector<ClothEdgeData>      mEdgeClothData;
         std::vector<ClothTriangleData>  mTriangleClothData;
 
         bwgl::VertexBuffer mVertexClothBuffer;
@@ -129,7 +151,10 @@ namespace pbd {
 
         bwgl::VertexBuffer mVertexPredictedPositionsBuffer;
         cl::BufferGL mVertexPredictedPositionsBufferCL;
+
         cl::Buffer mTriangleClothBufferCL;
+        cl::Buffer mEdgeClothBufferCL;
+
         cl::Buffer mVertexInBinPosCL;
     };
 }

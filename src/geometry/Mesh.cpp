@@ -3,17 +3,21 @@
 #include <util/OCL_CALL.hpp>
 
 namespace pbd {
-    Mesh::Mesh(std::vector<Vertex> &&vertices, std::vector<Triangle> &&triangles, GLenum usage)
+    Mesh::Mesh(std::vector<Vertex>    && vertices,
+               std::vector<Edge>      && edges,
+               std::vector<Triangle>  && triangles,
+               GLenum usage)
             : mVertexBuffer(GL_ARRAY_BUFFER, usage),
+              mEdgeBuffer(GL_ARRAY_BUFFER, usage),
               mTriangleBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_STATIC_DRAW),
               mVertices(vertices),
+              mEdges(edges),
               mTriangles(triangles),
               mHasUploadedHostData(false) {
         mTexDiffuse.ID = 0;
         mTexSpecular.ID = 0;
         mTexBump.ID = 0;
     }
-
 
     void Mesh::render(clgl::BaseShader &shader, const glm::mat4 &VP, const glm::mat4 &M) {
         shader.use();
@@ -65,6 +69,7 @@ namespace pbd {
 
         mHasUploadedHostData = true;
         mNumVertices = mVertices.size();
+        mNumEdges = mEdges.size();
         mNumTriangles = mTriangles.size();
 
         mVAO.bind();
@@ -88,6 +93,9 @@ namespace pbd {
         OGL_CALL(glVertexAttribPointer(VertexAttributes::COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                                        (GLvoid *) offsetof(Vertex, color)));
 
+        mEdgeBuffer.bind();
+        mEdgeBuffer.bufferData(numEdges() * sizeof(Edge), mEdges.data());
+
         mTriangleBuffer.bind();
         mTriangleBuffer.bufferData(numTriangles() * sizeof(Triangle), mTriangles.data());
 
@@ -97,16 +105,30 @@ namespace pbd {
     void Mesh::generateBuffersCL(cl::Context &context) {
         OCL_ERROR;
         OCL_CHECK(mVertexBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE, mVertexBuffer.ID(), CL_ERROR));
+        OCL_CHECK(mEdgeBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE, mEdgeBuffer.ID(), CL_ERROR));
         OCL_CHECK(mTriangleBufferCL = cl::BufferGL(context, CL_MEM_READ_ONLY, mTriangleBuffer.ID(), CL_ERROR));
     }
 
     void Mesh::clearHostData() {
         mVertices.clear();
+        mEdges.clear();
         mTriangles.clear();
+    }
+
+    std::vector<cl::Memory> Mesh::getMemoryCL() {
+        std::vector<cl::Memory> memory;
+        memory.push_back(mVertexBufferCL);
+        memory.push_back(mEdgeBufferCL);
+        memory.push_back(mTriangleBufferCL);
+        return memory;
     }
 
     unsigned long Mesh::numVertices() {
         return mHasUploadedHostData ? mNumVertices : mVertices.size();
+    }
+
+    unsigned long Mesh::numEdges() {
+        return mHasUploadedHostData ? mNumEdges : mEdges.size();
     }
 
     unsigned long Mesh::numTriangles() {

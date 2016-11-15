@@ -17,7 +17,7 @@
 namespace pbd {
     ClothSimulationScene::ClothSimulationScene(cl::Context &context, cl::Device &device, cl::CommandQueue &queue)
             : BaseScene(context, device, queue) {
-        mCurrentSetupFile = RESOURCEPATH("setups/cloth_sheet.json");
+        mCurrentSetupFile = RESOURCEPATH("setups/simple.json");
         createCamera();
         loadKernels();
 
@@ -113,6 +113,7 @@ namespace pbd {
         });
 
         /// FPS Labels
+        mLabelFrameNumber = new Label(win, "Current frame: 0");
         mLabelAverageFrameTime = new Label(win, "");
         mLabelFPS = new Label(win, "");
         updateTimeLabelsInGUI(0.0);
@@ -122,6 +123,7 @@ namespace pbd {
         while (!mSimulationTimes.empty()) mSimulationTimes.pop_back();
         updateTimeLabelsInGUI(0.0);
 
+        mFrameCounter = 0;
         mMemObjects.clear();
         mShaders.clear();
         mRenderObjects.clear();
@@ -183,12 +185,17 @@ namespace pbd {
             mSimulationTimes.pop_back();
         }
         mSimulationTimes.push_front(timeEnd - timeBegin);
+        ++mFrameCounter;
 
         // update GUI twice each second
         if (timeEnd - mTimeOfLastUpdate > 2.0f) {
             updateTimeLabelsInGUI(timeEnd - mTimeOfLastUpdate);
             mFramesSinceLastUpdate = 0;
         }
+
+        std::stringstream ss;
+        ss << "Frame: " << mFrameCounter;
+        mLabelFrameNumber->setCaption(ss.str());
     }
 
     void ClothSimulationScene::render() {
@@ -281,8 +288,21 @@ namespace pbd {
                                                                     "predict_positions",
                                                                     CL_ERROR));
         OCL_CHECK(mSetPositionsToPredicted = util::make_unique<cl::Kernel>(*mPredictPositionsProgram,
-                                                                           "set_positions_to_predicted",
-                                                                           CL_ERROR));
+                                                                           "set_positions_to_predicted", CL_ERROR));
+
+        mClothSimulationProgram = util::LoadCLProgram("cloth_simulation.cl", mContext, mDevice);
+        OCL_CHECK(mCalcClothMass = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
+                                                                 "calc_cloth_mass",
+                                                                 CL_ERROR));
+        OCL_CHECK(mCalcInverseMass = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
+                                                                   "calc_inverse_mass",
+                                                                   CL_ERROR));
+        OCL_CHECK(mCalcEdgeProperties = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
+                                                                      "calc_edge_properties",
+                                                                      CL_ERROR));
+        OCL_CHECK(mClipToPlanes = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
+                                                                "clip_to_planes",
+                                                                CL_ERROR));
     }
 
     void ClothSimulationScene::loadSetup() {
@@ -344,13 +364,36 @@ namespace pbd {
             mesh->generateBuffersCL(mContext);
             mesh->clearHostData();
 
-            {
-                mMemObjects.push_back(mesh->mVertexBufferCL);
-                mMemObjects.push_back(mesh->mTriangleBufferCL);
-                if (cloth) {
-                    mMemObjects.push_back(cloth->mVertexClothBufferCL);
-                    mMemObjects.push_back(cloth->mVertexVelocitiesBufferCL);
-                }
+            // Add these OpenGL memory objects to a vector for easy acquire/release
+            auto memObjects = mesh->getMemoryCL();
+            mMemObjects.insert(mMemObjects.end(), memObjects.begin(), memObjects.end());
+            memObjects.clear();
+
+            /// Calculate initial values for this cloth mesh
+            if (cloth) {
+                auto memory = cloth->getMemoryCL();
+                OCL_CALL(mQueue.enqueueAcquireGLObjects(&memory));
+
+                /// kernels/cloth_simulation.cl -> calc_cloth_mass
+                OCL_CALL(mCalcClothMass->setArg(0, cloth->mVertexBufferCL));
+                OCL_CALL(mCalcClothMass->setArg(1, cloth->mVertexClothBufferCL));
+                OCL_CALL(mCalcClothMass->setArg(2, cloth->mTriangleBufferCL));
+                OCL_CALL(mCalcClothMass->setArg(3, cloth->mTriangleClothBufferCL));
+                OCL_CALL(mQueue.enqueueNDRangeKernel(*mCalcClothMass, cl::NullRange, cl::NDRange(cloth->numTriangles()), cl::NullRange));
+
+                /// kernels/cloth_simulation.cl -> calc_inverse_mass
+                OCL_CALL(mCalcInverseMass->setArg(0, cloth->mVertexClothBufferCL));
+                OCL_CALL(mQueue.enqueueNDRangeKernel(*mCalcInverseMass, cl::NullRange, cl::NDRange(cloth->numVertices()), cl::NullRange));
+
+                /// kernels/cloth_simulation.cl -> calc_edge_properties
+                OCL_CALL(mCalcEdgeProperties->setArg(0, cloth->mVertexBufferCL));
+                OCL_CALL(mCalcEdgeProperties->setArg(1, cloth->mTriangleBufferCL));
+                OCL_CALL(mCalcEdgeProperties->setArg(2, cloth->mEdgeBufferCL));
+                OCL_CALL(mCalcEdgeProperties->setArg(3, cloth->mEdgeClothBufferCL));
+                OCL_CALL(mCalcEdgeProperties->setArg(4, cloth->mTriangleClothBufferCL));
+                OCL_CALL(mQueue.enqueueNDRangeKernel(*mCalcEdgeProperties, cl::NullRange, cl::NDRange(cloth->numEdges()), cl::NullRange));
+
+                OCL_CALL(mQueue.enqueueReleaseGLObjects(&memory));
             }
 
             auto shader = mShaders[meshconfig.shader];

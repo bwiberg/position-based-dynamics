@@ -15,6 +15,17 @@ namespace pbd {
     };
 
     /**
+      * Host (CPU) representation of extra cloth edge data.
+      * Matches the memory layout of the ClothEdge struct
+      * in kernels/common/ClothMesh.cl
+      */
+    struct ATTR_PACKED ClothEdgeData {
+        unsigned int edgeID;
+        float initialDihedralAngle;
+        float initialLength;
+    };
+
+    /**
      * Host (CPU) representation of cloth triangle data.
      * Matches the memory layout of the ClothVertexData
      * struct in kernels/common/ClothMesh.cl

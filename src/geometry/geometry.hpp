@@ -20,16 +20,22 @@ namespace pbd {
      * Host (CPU) representation of a vertex.
      * Matches the memory layout of the Vertex struct
      * in kernels/common/Mesh.cl
-     *
-     * The __padding elements are needed to match vec3's
-     * with OpenCL's cl_float3, which * are 4-component
-     * vectors.
      */
-    struct Vertex {
+    struct ATTR_PACKED Vertex {
         glm::vec3 position;
         glm::vec3 normal;
         glm::vec2 texCoord;
         glm::vec4 color;
+    };
+
+    /**
+     * Host (CPU) representation of an edge.
+     * Matches the memory layout of the Edge struct
+     * in kernels/common/Mesh.cl
+     */
+    struct ATTR_PACKED Edge {
+        int triangles[2];
+        uint vertices[2];
     };
 
     /**

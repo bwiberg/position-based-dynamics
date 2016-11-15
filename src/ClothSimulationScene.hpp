@@ -77,9 +77,22 @@ namespace pbd {
 
         std::vector<cl::Memory> mMemObjects;
 
+        uint mFrameCounter;
+
         std::unique_ptr<cl::Program> mPredictPositionsProgram;
         std::unique_ptr<cl::Kernel> mPredictPositions;
         std::unique_ptr<cl::Kernel> mSetPositionsToPredicted;
+
+        std::unique_ptr<cl::Program> mClothSimulationProgram;
+
+        /// Cloth Mesh setup kernels ///
+        std::unique_ptr<cl::Kernel> mCalcClothMass;
+        std::unique_ptr<cl::Kernel> mCalcInverseMass;
+        std::unique_ptr<cl::Kernel> mCalcEdgeProperties;
+
+        /// Position correction kernels ///
+
+        std::unique_ptr<cl::Kernel> mClipToPlanes;
 
         std::unique_ptr<pbd::Grid> mGridCL;
         std::unique_ptr<cl::Buffer> mBinCountCL; // CxCxC-sized uint buffer, containing particle count per cell
@@ -96,6 +109,7 @@ namespace pbd {
         uint mFramesSinceLastUpdate;
 
         nanogui::Label *mLabelFPS;
+        nanogui::Label *mLabelFrameNumber;
         nanogui::Label *mLabelAverageFrameTime;
         nanogui::Label *mErrorLabel;
     };

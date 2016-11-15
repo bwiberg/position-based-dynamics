@@ -3,22 +3,31 @@
 #include <util/OCL_CALL.hpp>
 
 namespace pbd {
-    ClothMesh::ClothMesh(std::vector<Vertex> &&vertices,
-                         std::vector<ClothVertexData> &&clothVertexData,
-                         std::vector<Triangle> &&triangles,
-                         std::vector<ClothTriangleData> &&clothTriangleData)
-            : Mesh(std::move(vertices), std::move(triangles), GL_DYNAMIC_DRAW),
+    ClothMesh::ClothMesh(std::vector<Vertex>               && vertices,
+                         std::vector<ClothVertexData>      && clothVertexData,
+                         std::vector<Edge>                 && edges,
+                         std::vector<ClothEdgeData>        && clothEdgeData,
+                         std::vector<Triangle>             && triangles,
+                         std::vector<ClothTriangleData>    && clothTriangleData)
+            : Mesh(std::move(vertices),
+                   std::move(edges),
+                   std::move(triangles),
+                   GL_DYNAMIC_DRAW),
               mVertexClothBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
               mVertexVelocitiesBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
               mVertexPredictedPositionsBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
               mVertexClothData(clothVertexData),
+              mEdgeClothData(clothEdgeData),
               mTriangleClothData(clothTriangleData) {}
 
-    ClothMesh::ClothMesh(Mesh &&mesh,
-                         std::vector<ClothVertexData> &&clothVertexData,
-                         std::vector<ClothTriangleData> &&clothTriangleData)
+    ClothMesh::ClothMesh(Mesh && mesh,
+                         std::vector<ClothVertexData>      && clothVertexData,
+                         std::vector<ClothEdgeData>        && clothEdgeData,
+                         std::vector<ClothTriangleData>    && clothTriangleData)
             : ClothMesh(std::move(mesh.mVertices),
                         std::move(clothVertexData),
+                        std::move(mesh.mEdges),
+                        std::move(clothEdgeData),
                         std::move(mesh.mTriangles),
                         std::move(clothTriangleData)) {
         mTexDiffuse = mesh.mTexDiffuse;
@@ -62,6 +71,8 @@ namespace pbd {
 
         OCL_CHECK(mVertexClothBufferCL = cl::BufferGL(context, CL_MEM_READ_ONLY, mVertexClothBuffer.ID()));
         OCL_CHECK(mVertexVelocitiesBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE, mVertexVelocitiesBuffer.ID()));
+        OCL_CHECK(mEdgeClothBufferCL = cl::Buffer(context, CL_MEM_READ_ONLY,
+                                                  sizeof(ClothEdgeData) * numEdges()));
         OCL_CHECK(mTriangleClothBufferCL = cl::Buffer(context, CL_MEM_READ_ONLY,
                                                       sizeof(ClothTriangleData) * numTriangles()));
         OCL_CHECK(mVertexPredictedPositionsBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE,
@@ -74,7 +85,15 @@ namespace pbd {
     void ClothMesh::clearHostData() {
         Mesh::clearHostData();
         mVertexClothData.clear();
+        mEdgeClothData.clear();
         mTriangleClothData.clear();
+    }
+
+    std::vector<cl::Memory> ClothMesh::getMemoryCL() {
+        auto memory = Mesh::getMemoryCL();
+        memory.push_back(mVertexPredictedPositionsBufferCL);
+        memory.push_back(mVertexVelocitiesBufferCL);
+        return memory;
     }
 
     void ClothMesh::render(clgl::BaseShader &shader, const glm::mat4 &VP, const glm::mat4 &M) {

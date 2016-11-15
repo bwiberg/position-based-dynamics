@@ -10,6 +10,15 @@ typedef struct def_Vertex {
 } Vertex;
 
 /**
+ * OpenCL representation of an edge. Matches the memory layout
+ * of the Edge struct in src/geometry/geometry.hpp
+ */
+typedef struct def_Edge {
+    int triangles[2];
+    uint vertices[2];
+} Edge;
+
+/**
  * OpenCL representation of a triangle. Matches the memory layout
  * of the Triangle struct in src/geometry/geometry.hpp
  */

@@ -9,6 +9,7 @@
 #include <SOIL.h>
 
 #include <map>
+#include <set>
 
 namespace pbd {
     namespace MeshLoader {
@@ -64,10 +65,67 @@ namespace pbd {
             return texture;
         }
 
+        std::vector<Edge> CalcEdges(const std::vector<Triangle> &triangles) {
+
+            typedef unsigned int uint;
+            typedef std::pair<uint, uint> edge;
+
+            std::map<edge, std::vector<uint>> edgeTriangles;
+
+            uint minv, medv, maxv;
+            edge e0, e1, e2;
+            uint triangleID = 0;
+
+            /// Build look-up table for edge->triangles
+            for (const auto &tri : triangles) {
+                minv = util::min(tri.vertices.x, tri.vertices.y, tri.vertices.z);
+                medv = util::median(tri.vertices.x, tri.vertices.y, tri.vertices.z);
+                maxv = util::max(tri.vertices.x, tri.vertices.y, tri.vertices.z);
+
+                e0 = std::make_pair(minv, medv);
+                e1 = std::make_pair(medv, maxv);
+                e2 = std::make_pair(minv, maxv);
+
+                edgeTriangles[e0].push_back(triangleID);
+                edgeTriangles[e1].push_back(triangleID);
+                edgeTriangles[e2].push_back(triangleID);
+
+                ++triangleID;
+            }
+
+            std::vector<Edge> edgevector;
+
+            /// create Edge struct for each "edge" and lookup neighbouring triangles
+#define NO_TRIANGLE -1
+            Edge newedge;
+            uint count1 = 0, count2 = 0;
+            for (const auto &entry : edgeTriangles){
+
+                const auto &edge_ = entry.first;
+                const auto &tris = entry.second;
+
+                newedge.vertices[0] = edge_.first;
+                newedge.vertices[1] = edge_.second;
+
+                assert(tris.size() == 1 || tris.size() == 2);
+                newedge.triangles[0] = tris[0];
+                newedge.triangles[1] = (tris.size() == 2 ? tris[1] : NO_TRIANGLE);
+
+                edgevector.push_back(newedge);
+
+                if (tris.size() == 1) ++count1; else ++count2;
+            }
+            std::cout << count1 << ", " << count2 << std::endl;
+#undef NO_TRIANGLE
+
+            edgevector.shrink_to_fit();
+            return edgevector;
+        }
+
         /**
          * http://stackoverflow.com/questions/8846501/neighbor-polygons-from-list-of-polygon-indices
          */
-        std::vector<ClothTriangleData> CalculateTriangleNeighbours(const std::vector<Triangle> &triangles) {
+        std::vector<ClothTriangleData> CalcClothTriangleData(const std::vector<Triangle> &triangles) {
             std::vector<ClothTriangleData> clothTriangleData;
             clothTriangleData.resize(triangles.size());
 
@@ -132,11 +190,15 @@ namespace pbd {
             }
 
 #ifndef NDEBUG
+            uint count1 = 0, count2 = 0;
             for (const auto &ctdata : clothTriangleData) {
                 for (uint i = 0; i < 3; ++i) {
                     const int neighbourID = ctdata.neighbourIDs[i];
 
+                    count1 += 1;
                     if (neighbourID == -1) continue;
+                    count1 -= 1;
+                    count2 += 1;
 
                     // assert that the neighbour also has THIS triangle as its neighbour
                     auto neighbour = clothTriangleData[neighbourID];
@@ -197,7 +259,9 @@ namespace pbd {
                 triangles[i] = triangle;
             }
 
-            auto mesh = std::make_shared<Mesh>(std::move(vertices), std::move(triangles));
+            auto edges = CalcEdges(triangles);
+
+            auto mesh = std::make_shared<Mesh>(std::move(vertices), std::move(edges), std::move(triangles));
 
             aiMaterial *material = scene->mMaterials[aimesh->mMaterialIndex];
             aiString texturePath;
@@ -224,18 +288,35 @@ namespace pbd {
         std::shared_ptr<ClothMesh> LoadClothMesh(const std::string &path) {
             auto regularMesh = LoadMesh(path);
 
-            auto clothTriangleData = CalculateTriangleNeighbours(regularMesh->mTriangles);
+            auto clothTriangleData = CalcClothTriangleData(regularMesh->mTriangles);
 
             std::vector<ClothVertexData> clothVertexData;
-            ClothVertexData data;
-            data.mass = 1.0f;
-            for (unsigned int i = 0; i < regularMesh->numVertices(); ++i) {
-                data.vertexID = i;
-                clothVertexData.push_back(data);
+            {
+                ClothVertexData data;
+                data.mass = 0.0f;
+                data.mass = 0.0f;
+                for (unsigned int i = 0; i < regularMesh->numVertices(); ++i) {
+                    data.vertexID = i;
+                    clothVertexData.push_back(data);
+                }
+            }
+
+            std::vector<ClothEdgeData> clothEdgeData;
+            {
+                ClothEdgeData data;
+                data.initialDihedralAngle = 0.0f;
+                data.initialLength = 0.0f;
+                for (unsigned int i = 0; i < regularMesh->numEdges(); ++i) {
+                    data.edgeID = i;
+                    clothEdgeData.push_back(data);
+                }
             }
 
             return std::make_shared<ClothMesh>(
-                    std::move(*regularMesh), std::move(clothVertexData), std::move(clothTriangleData)
+                    std::move(*regularMesh),
+                    std::move(clothVertexData),
+                    std::move(clothEdgeData),
+                    std::move(clothTriangleData)
             );
         }
     }
