@@ -37,6 +37,8 @@ float calc_dihedral_angle(const float3 p1,
                           const float3 p3,
                           const float3 p4);
 
+
+
 float3 Float3(float x, float y, float z);
 
 float3 Cross(float3 u, float3 v);
@@ -77,7 +79,9 @@ __kernel void calc_cloth_mass(__global const Vertex      *vertices,          // 
 
     const float triangleMass = 0.5f * length(Cross(AB, AC));
 
-    printf("calc_cloth_mass, ID=%i, triangleMass=%f\n", ID, triangleMass);
+    if (ID < 6) {
+        printf("calc_cloth_mass, ID=%i, triangleMass=%f\n", ID, triangleMass);
+    }
 
     // save this mass into the triangle's memory
     clothTriangles[ID].mass = triangleMass;
@@ -102,8 +106,10 @@ __kernel void calc_cloth_mass(__global const Vertex      *vertices,          // 
 __kernel void calc_inverse_mass(__global ClothVertexData *clothVertices) {
     clothVertices[ID].invmass = 1.0f / clothVertices[ID].mass;
 
+    if (ID < 6) {
     printf("calc_inverse_mass, ID=%i, mass=%f, invmass=%f\n", ID,
             clothVertices[ID].mass, clothVertices[ID].invmass);
+    }
 }
 
 /**
@@ -140,11 +146,6 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
     const Triangle TL = triangles[thisedge.triangles[0]];
     const Triangle TR = triangles[thisedge.triangles[1]];
 
-    printf("TL0=%i, TL1=%i, TL2=%i, TR0=%i, TR1=%i, TR2=%i\n",
-            TL.vertices[0], TL.vertices[1], TL.vertices[2],
-            TR.vertices[0], TR.vertices[1], TR.vertices[2]);
-
-
     // find the vertices in the triangles that aren't p1 and p2
     uint p3ID, p4ID;
     if      (TL.vertices[0] != p1ID && TL.vertices[0] != p2ID) p3ID = TL.vertices[0];
@@ -154,7 +155,6 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
     if      (TR.vertices[0] != p1ID && TR.vertices[0] != p2ID) p4ID = TR.vertices[0];
     else if (TR.vertices[1] != p1ID && TR.vertices[1] != p2ID) p4ID = TR.vertices[1];
     else if (TR.vertices[2] != p1ID && TR.vertices[2] != p2ID) p4ID = TR.vertices[2];
-    printf("p3ID=%i, p4ID=%i\n", p3ID, p4ID);
 
     const float3 p3 = POSITION(vertices[p3ID]);
     const float3 p4 = POSITION(vertices[p4ID]);
@@ -183,7 +183,6 @@ float calc_dihedral_angle(const float3 p1,
                           const float3 p4) {
     const float3 n1 = normalize(Cross(p2 - p1, p3 - p1));
     const float3 n2 = normalize(Cross(p2 - p1, p4 - p1));
-    printf("n1=[%f, %f, %f], n2=[%f, %f, %f]\n", n1.x, n1.y, n1.z, n2.x, n2.y, n2.z);
 
     return acos(dot(n1, n2));
 }
