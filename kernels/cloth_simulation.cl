@@ -1,3 +1,5 @@
+#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
+
 typedef struct def_Vertex {
     float position[3];
     float normal[3];
@@ -43,12 +45,21 @@ float3 Float3(float x, float y, float z);
 
 float3 Cross(float3 u, float3 v);
 
+/**
+ * Atomic
+ */
 void atomic_add_global_float(volatile __global float *addr, float val);
+
+/**
+ * Component-wise atomic addition of a float3 vector
+ */
+void cmpwise_atomic_add_global_float3(volatile __global float3 *addr, float3 val);
 
 #define POSITION(vertex) Float3(vertex.position[0], vertex.position[1], vertex.position[2])
 #define ID get_global_id(0)
 
 #define ONE_THIRD 0.33333f
+#define EDGE_NO_TRIANGLE -1
 
 
 ////////////  ///////////////////////////////////////  ////////////
@@ -116,10 +127,10 @@ __kernel void calc_inverse_mass(__global ClothVertexData *clothVertices) {
  * For every edge
  */
 __kernel void calc_edge_properties(__global const Vertex        *vertices,          // 0
-                                   __global const Triangle      *triangles,         // 1
-                                   __global Edge                *edges,             // 2
-                                   __global ClothEdgeData       *clothEdges,        // 3
-                                   __global ClothTriangleData   *clothTriangles) {  // 4
+                                __global const Triangle      *triangles,         // 1
+                                __global Edge               *edges,             // 2
+                                __global ClothEdgeData      *clothEdges,        // 3
+                                __global ClothTriangleData  *clothTriangles) {  // 4
 
     const Edge thisedge = edges[ID];
 
@@ -160,8 +171,8 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
 ////////////  //////////// POSITION CORRECTION KERNELS ////////////  ////////////
 ////////////  /////////////////////////////////////////////////////  ////////////
 
-__kernel void clip_to_planes(__global Vertex *vertices) {
-    vertices[ID].position[1] = max(vertices[ID].position[1], 0.0f);
+__kernel void clip_to_planes(__global float3 *predictedPositions) {
+    predictedPositions[ID].y = max(predictedPositions[ID].y, 0.0f);
 }
 
 /**
@@ -173,23 +184,71 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
                                      __global const ClothEdgeData        *clothEdges,            // 3
                                      __global const Triangle             *triangles,             // 4
                                      __global const ClothTriangleData    *clothTriangles,        // 5
-                                     __global const float3               *predictedPositions,    // 6
-                                     __global float3                     *positionCorrections) { // 7
+                                     __global const float3                *predictedPositions,    // 6
+                                     volatile __global float3              *positionCorrections) { // 7
     
     const Edge edge                 = edges[ID];
     const ClothEdgeData clothEdge   = clothEdges[ID];
     
-    //const Vertex v1 = edge.vertices[0];
-    //const Vertex v2 = edge.vertices[1];
+    const int v1ID = edge.vertices[0];
+    const int v2ID = edge.vertices[1];
     
-    //const float3 p1 = POSITION(v1);
-    //const float3 p2 = POSITION(v2);
+    const ClothVertexData cv1   = clothVertices[v1ID];
+    const ClothVertexData cv2   = clothVertices[v2ID];
     
-    /// stretch constraint
-    //const float Cstretch = length(p1 - p2) - clothEdge.initialLength;
+    const float3 p1 = predictedPositions[v1ID];
+    const float3 p2 = predictedPositions[v2ID];
     
+    //////////////////////////
+    /// stretch constraint ///
+    //////////////////////////
     
+    const float3 p2p1 = p1 - p2;
+    const float p2p1length = length(p2p1);
     
+    const float Cstretch = p2p1length - clothEdge.initialLength;
+    const float3 gradCstretch = 0.01 * p2p1 / p2p1length;
+    
+    const float tmp = 1 / (cv1.invmass + cv2.invmass);
+    
+    float3 deltaP1 = -(cv1.invmass * tmp) * Cstretch * gradCstretch;
+    float3 deltaP2 =  (cv2.invmass * tmp) * Cstretch * gradCstretch;
+    
+    if (ID == 0) {
+        //printf("deltaP1 = [%f, %f, %f]", deltaP1.x, deltaP1.y, deltaP1.z);
+        //printf(", deltaP2 = [%f, %f, %f]\n", deltaP2.x, deltaP2.y, deltaP2.z);
+    }
+    
+    ///////////////////////
+    /// bend constraint ///
+    ///////////////////////
+    
+    if (edge.triangles[1] != EDGE_NO_TRIANGLE) {
+        const int v3ID = edge.vertices[2];
+        const int v4ID = edge.vertices[3];
+        
+        deltaP1 += Float3(0.0f, 0.0f, 0.0f);
+        deltaP2 += Float3(0.0f, 0.0f, 0.0f);
+        const float3 deltaP3 = Float3(0.0f, 0.0f, 0.0f);
+        const float3 deltaP4 = Float3(0.0f, 0.0f, 0.0f);
+        
+        cmpwise_atomic_add_global_float3(&(positionCorrections[v3ID]), deltaP3);
+        cmpwise_atomic_add_global_float3(&(positionCorrections[v4ID]), deltaP4);
+    }
+    
+    cmpwise_atomic_add_global_float3(&(positionCorrections[v1ID]), deltaP1);
+    cmpwise_atomic_add_global_float3(&(positionCorrections[v2ID]), deltaP2);
+}
+
+/**
+ *  For every vertex
+ */
+__kernel void correct_predictions(__global float3      *positionCorrections,   // 0
+                               __global float3      *predictedPositions) {  // 1
+    predictedPositions[ID] += positionCorrections[ID];
+    
+    // don't forget to reset position correction when we're done!
+    positionCorrections[ID] = Float3(0.0f, 0.0f, 0.0f);
 }
 
 float calc_dihedral_angle(const float3 p1,
@@ -231,4 +290,12 @@ void atomic_add_global_float(volatile __global float *addr, float val) {
         current.u32  = atomic_cmpxchg( (volatile __global unsigned int *)addr,
                                        expected.u32, next.u32);
     } while( current.u32 != expected.u32 );
+}
+
+void cmpwise_atomic_add_global_float3(volatile __global float3 *addr, float3 val) {
+    volatile __global float *faddr = (__global float *) addr;
+    
+    atomic_add_global_float(&(faddr[0]), val.x);
+    atomic_add_global_float(&(faddr[1]), val.y);
+    atomic_add_global_float(&(faddr[2]), val.z);
 }

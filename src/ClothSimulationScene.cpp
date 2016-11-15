@@ -194,15 +194,31 @@ namespace pbd {
             ENQUEUE_VERTICES(mPredictPositions, clothmesh);
         }
 
+        for (uint iter = 0; iter < mParams.numSubSteps; ++iter) {
+            for (auto clothmesh : mClothMeshes) {
+                mClipToPlanes->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL);
+                ENQUEUE_VERTICES(mClipToPlanes, clothmesh);
+
+                OCL_CALL(mCalcPositionCorrections->setArg(0, clothmesh->mVertexBufferCL));
+                OCL_CALL(mCalcPositionCorrections->setArg(1, clothmesh->mVertexClothBufferCL));
+                OCL_CALL(mCalcPositionCorrections->setArg(2, clothmesh->mEdgeBufferCL));
+                OCL_CALL(mCalcPositionCorrections->setArg(3, clothmesh->mEdgeClothBufferCL));
+                OCL_CALL(mCalcPositionCorrections->setArg(4, clothmesh->mTriangleBufferCL));
+                OCL_CALL(mCalcPositionCorrections->setArg(5, clothmesh->mTriangleClothBufferCL));
+                OCL_CALL(mCalcPositionCorrections->setArg(6, clothmesh->mVertexPredictedPositionsBufferCL));
+                OCL_CALL(mCalcPositionCorrections->setArg(7, clothmesh->mVertexPositionCorrectionsBufferCL));
+                ENQUEUE_EDGES(mCalcPositionCorrections, clothmesh);
+
+                OCL_CALL(mCorrectPredictions->setArg(0, clothmesh->mVertexPositionCorrectionsBufferCL));
+                OCL_CALL(mCorrectPredictions->setArg(1, clothmesh->mVertexPredictedPositionsBufferCL));
+                ENQUEUE_VERTICES(mCorrectPredictions, clothmesh);
+            }
+        }
+
         for (auto clothmesh : mClothMeshes) {
             OCL_CALL(mSetPositionsToPredicted->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
             OCL_CALL(mSetPositionsToPredicted->setArg(1, clothmesh->mVertexBufferCL));
             ENQUEUE_VERTICES(mSetPositionsToPredicted, clothmesh);
-        }
-
-        for (auto clothmesh : mClothMeshes) {
-            mClipToPlanes->setArg(0, clothmesh->mVertexBufferCL);
-            ENQUEUE_VERTICES(mClipToPlanes, clothmesh);
         }
 
         OCL_CALL(mQueue.enqueueReleaseGLObjects(&mMemObjects, NULL, &event));
@@ -331,6 +347,13 @@ namespace pbd {
         OCL_CHECK(mClipToPlanes = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
                                                                 "clip_to_planes",
                                                                 CL_ERROR));
+        OCL_CHECK(mCalcPositionCorrections = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
+                                                                           "calc_position_corrections",
+                                                                           CL_ERROR));
+        OCL_CHECK(mCorrectPredictions = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
+                                                                      "correct_predictions",
+                                                                      CL_ERROR));
+
     }
 
     void ClothSimulationScene::loadSetup() {

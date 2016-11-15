@@ -100,6 +100,8 @@ namespace pbd {
         /// Position correction kernels ///
 
         std::unique_ptr<cl::Kernel> mClipToPlanes;
+        std::unique_ptr<cl::Kernel> mCalcPositionCorrections;
+        std::unique_ptr<cl::Kernel> mCorrectPredictions;
 
         std::unique_ptr<pbd::Grid> mGridCL;
         std::unique_ptr<cl::Buffer> mBinCountCL; // CxCxC-sized uint buffer, containing particle count per cell
