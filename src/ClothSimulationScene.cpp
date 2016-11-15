@@ -14,6 +14,14 @@
 
 #include <glm/ext.hpp>
 
+#define ENQUEUE(kernelptr, clothptr, what) \
+        OCL_CALL(mQueue.enqueueNDRangeKernel(*kernelptr, cl::NullRange, \
+cl::NDRange(clothptr->what()), cl::NullRange));
+
+#define ENQUEUE_VERTICES(kernelptr, clothptr)   ENQUEUE(kernelptr, clothptr, numVertices)
+#define ENQUEUE_EDGES(kernelptr, clothptr)      ENQUEUE(kernelptr, clothptr, numEdges)
+#define ENQUEUE_TRIANGLES(kernelptr, clothptr)  ENQUEUE(kernelptr, clothptr, numTriangles)
+
 namespace pbd {
     ClothSimulationScene::ClothSimulationScene(cl::Context &context, cl::Device &device, cl::CommandQueue &queue)
             : BaseScene(context, device, queue) {
@@ -155,26 +163,24 @@ namespace pbd {
         /// Update simulation
         /// ...
         /// ...
+
         for (auto clothmesh : mClothMeshes) {
             OCL_CALL(mPredictPositions->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
             OCL_CALL(mPredictPositions->setArg(1, clothmesh->mVertexVelocitiesBufferCL));
             OCL_CALL(mPredictPositions->setArg(2, clothmesh->mVertexBufferCL));
             OCL_CALL(mPredictPositions->setArg(3, 0.01f));
-
-            OCL_CALL(mQueue.enqueueNDRangeKernel(*mPredictPositions,
-                                                 cl::NullRange,
-                                                 cl::NDRange(clothmesh->numVertices()),
-                                                 cl::NullRange));
+            ENQUEUE_VERTICES(mPredictPositions, clothmesh);
         }
 
         for (auto clothmesh : mClothMeshes) {
             OCL_CALL(mSetPositionsToPredicted->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
             OCL_CALL(mSetPositionsToPredicted->setArg(1, clothmesh->mVertexBufferCL));
-
-            OCL_CALL(mQueue.enqueueNDRangeKernel(*mSetPositionsToPredicted,
-                                                 cl::NullRange,
-                                                 cl::NDRange(clothmesh->numVertices()),
-                                                 cl::NullRange));
+            ENQUEUE_VERTICES(mSetPositionsToPredicted, clothmesh);
+        }
+        
+        for (auto clothmesh : mClothMeshes) {
+            mClipToPlanes->setArg(0, clothmesh->mVertexBufferCL);
+            ENQUEUE_VERTICES(mClipToPlanes, clothmesh);
         }
 
         OCL_CALL(mQueue.enqueueReleaseGLObjects(&mMemObjects, NULL, &event));
@@ -379,11 +385,11 @@ namespace pbd {
                 OCL_CALL(mCalcClothMass->setArg(1, cloth->mVertexClothBufferCL));
                 OCL_CALL(mCalcClothMass->setArg(2, cloth->mTriangleBufferCL));
                 OCL_CALL(mCalcClothMass->setArg(3, cloth->mTriangleClothBufferCL));
-                OCL_CALL(mQueue.enqueueNDRangeKernel(*mCalcClothMass, cl::NullRange, cl::NDRange(cloth->numTriangles()), cl::NullRange));
+                ENQUEUE_TRIANGLES(mCalcClothMass, cloth);
 
                 /// kernels/cloth_simulation.cl -> calc_inverse_mass
                 OCL_CALL(mCalcInverseMass->setArg(0, cloth->mVertexClothBufferCL));
-                OCL_CALL(mQueue.enqueueNDRangeKernel(*mCalcInverseMass, cl::NullRange, cl::NDRange(cloth->numVertices()), cl::NullRange));
+                ENQUEUE_VERTICES(mCalcInverseMass, cloth);
 
                 /// kernels/cloth_simulation.cl -> calc_edge_properties
                 OCL_CALL(mCalcEdgeProperties->setArg(0, cloth->mVertexBufferCL));
@@ -391,7 +397,7 @@ namespace pbd {
                 OCL_CALL(mCalcEdgeProperties->setArg(2, cloth->mEdgeBufferCL));
                 OCL_CALL(mCalcEdgeProperties->setArg(3, cloth->mEdgeClothBufferCL));
                 OCL_CALL(mCalcEdgeProperties->setArg(4, cloth->mTriangleClothBufferCL));
-                OCL_CALL(mQueue.enqueueNDRangeKernel(*mCalcEdgeProperties, cl::NullRange, cl::NDRange(cloth->numEdges()), cl::NullRange));
+                ENQUEUE_EDGES(mCalcEdgeProperties, cloth);
 
                 OCL_CALL(mQueue.enqueueReleaseGLObjects(&memory));
             }
