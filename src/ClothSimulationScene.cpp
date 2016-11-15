@@ -190,7 +190,8 @@ namespace pbd {
             OCL_CALL(mPredictPositions->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
             OCL_CALL(mPredictPositions->setArg(1, clothmesh->mVertexVelocitiesBufferCL));
             OCL_CALL(mPredictPositions->setArg(2, clothmesh->mVertexBufferCL));
-            OCL_CALL(mPredictPositions->setArg(3, 0.01f));
+            OCL_CALL(mPredictPositions->setArg(3, clothmesh->mVertexClothBufferCL));
+            OCL_CALL(mPredictPositions->setArg(4, mParams.deltaTime));
             ENQUEUE_VERTICES(mPredictPositions, clothmesh);
         }
 
@@ -207,6 +208,7 @@ namespace pbd {
                 OCL_CALL(mCalcPositionCorrections->setArg(5, clothmesh->mTriangleClothBufferCL));
                 OCL_CALL(mCalcPositionCorrections->setArg(6, clothmesh->mVertexPredictedPositionsBufferCL));
                 OCL_CALL(mCalcPositionCorrections->setArg(7, clothmesh->mVertexPositionCorrectionsBufferCL));
+                OCL_CALL(mCalcPositionCorrections->setArg(8, sizeof(ClothSimParams), (const void *) &mParams));
                 ENQUEUE_EDGES(mCalcPositionCorrections, clothmesh);
 
                 OCL_CALL(mCorrectPredictions->setArg(0, clothmesh->mVertexPositionCorrectionsBufferCL));
@@ -218,6 +220,8 @@ namespace pbd {
         for (auto clothmesh : mClothMeshes) {
             OCL_CALL(mSetPositionsToPredicted->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
             OCL_CALL(mSetPositionsToPredicted->setArg(1, clothmesh->mVertexBufferCL));
+            OCL_CALL(mSetPositionsToPredicted->setArg(2, clothmesh->mVertexVelocitiesBufferCL));
+            OCL_CALL(mSetPositionsToPredicted->setArg(3, mParams.deltaTime));
             ENQUEUE_VERTICES(mSetPositionsToPredicted, clothmesh);
         }
 
@@ -344,6 +348,9 @@ namespace pbd {
         OCL_CHECK(mCalcEdgeProperties = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
                                                                       "calc_edge_properties",
                                                                       CL_ERROR));
+        OCL_CHECK(mFixVertex = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
+                                                             "fix_vertex",
+                                                             CL_ERROR));
         OCL_CHECK(mClipToPlanes = util::make_unique<cl::Kernel>(*mClothSimulationProgram,
                                                                 "clip_to_planes",
                                                                 CL_ERROR));
@@ -435,6 +442,10 @@ namespace pbd {
                 /// kernels/cloth_simulation.cl -> calc_inverse_mass
                 OCL_CALL(mCalcInverseMass->setArg(0, cloth->mVertexClothBufferCL));
                 ENQUEUE_VERTICES(mCalcInverseMass, cloth);
+
+                OCL_CALL(mFixVertex->setArg(0, cloth->mVertexClothBufferCL));
+                OCL_CALL(mFixVertex->setArg(1, 0));
+                ENQUEUE_VERTICES(mFixVertex, cloth);
 
                 /// kernels/cloth_simulation.cl -> calc_edge_properties
                 OCL_CALL(mCalcEdgeProperties->setArg(0, cloth->mVertexBufferCL));

@@ -99,6 +99,7 @@ namespace pbd {
 
         /// Position correction kernels ///
 
+        std::unique_ptr<cl::Kernel> mFixVertex;
         std::unique_ptr<cl::Kernel> mClipToPlanes;
         std::unique_ptr<cl::Kernel> mCalcPositionCorrections;
         std::unique_ptr<cl::Kernel> mCorrectPredictions;

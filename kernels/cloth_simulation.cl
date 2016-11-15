@@ -34,6 +34,14 @@ typedef struct def_ClothTriangleData {
     float mass;
 } ClothTriangleData;
 
+
+typedef struct def_ClothSimParams {
+    uint numSubSteps;   // Number of PBD constraint projection steps
+    float deltaTime;    // Time step (dt):
+    float k_stretch;    // PBD stiffness constant for cloth stretch constraint
+    float k_bend;       // PBD stiffness constant for cloth bending constraint
+} ClothSimParams;
+
 float calc_dihedral_angle(const float3 p1,
                           const float3 p2,
                           const float3 p3,
@@ -58,8 +66,11 @@ void cmpwise_atomic_add_global_float3(volatile __global float3 *addr, float3 val
 #define POSITION(vertex) Float3(vertex.position[0], vertex.position[1], vertex.position[2])
 #define ID get_global_id(0)
 
+#define PI 3.1415926535f
 #define ONE_THIRD 0.33333f
 #define EDGE_NO_TRIANGLE -1
+
+#define clamped_acos(x) acos(clamp(x, -0.99999999f, 0.99999999f))
 
 
 ////////////  ///////////////////////////////////////  ////////////
@@ -123,6 +134,13 @@ __kernel void calc_inverse_mass(__global ClothVertexData *clothVertices) {
     }
 }
 
+__kernel void fix_vertex(__global ClothVertexData *clothVertices,
+                         const int idToFix) {
+    if (ID != idToFix) return;
+    
+    clothVertices[ID].invmass = 0.0f;
+}
+
 /**
  * For every edge
  */
@@ -158,12 +176,12 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
     
     const float3 p3 = POSITION(vertices[p3ID]);
     const float3 p4 = POSITION(vertices[p4ID]);
-
+    
     clothEdges[ID].initialDihedralAngle = calc_dihedral_angle(p1, p2, p3, p4);
-
+    
     if (ID < 6) {
         printf("calc_edge_properties, ID=%i, initialLength=%f, dihedralAngle=%f\n",
-        ID, clothEdges[ID].initialLength, clothEdges[ID].initialDihedralAngle);
+               ID, clothEdges[ID].initialLength, clothEdges[ID].initialDihedralAngle);
     }
 }
 
@@ -172,7 +190,7 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
 ////////////  /////////////////////////////////////////////////////  ////////////
 
 __kernel void clip_to_planes(__global float3 *predictedPositions) {
-    predictedPositions[ID].y = max(predictedPositions[ID].y, 0.0f);
+    predictedPositions[ID].y = max(predictedPositions[ID].y, 0.02f);
 }
 
 /**
@@ -185,7 +203,8 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
                                      __global const Triangle             *triangles,             // 4
                                      __global const ClothTriangleData    *clothTriangles,        // 5
                                      __global const float3                *predictedPositions,    // 6
-                                     volatile __global float3              *positionCorrections) { // 7
+                                     volatile __global float3              *positionCorrections,   // 7
+                                     const ClothSimParams              params) {               // 8
     
     const Edge edge                 = edges[ID];
     const ClothEdgeData clothEdge   = clothEdges[ID];
@@ -196,8 +215,8 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
     const ClothVertexData cv1   = clothVertices[v1ID];
     const ClothVertexData cv2   = clothVertices[v2ID];
     
-    const float3 p1 = predictedPositions[v1ID];
-    const float3 p2 = predictedPositions[v2ID];
+    float3 p1 = predictedPositions[v1ID];
+    float3 p2 = predictedPositions[v2ID];
     
     //////////////////////////
     /// stretch constraint ///
@@ -207,17 +226,25 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
     const float p2p1length = length(p2p1);
     
     const float Cstretch = p2p1length - clothEdge.initialLength;
-    const float3 gradCstretch = 0.01 * p2p1 / p2p1length;
+    const float3 gradCstretch = params.k_stretch * p2p1 / max(p2p1length, 0.1f);
     
     const float tmp = 1 / (cv1.invmass + cv2.invmass);
     
     float3 deltaP1 = -(cv1.invmass * tmp) * Cstretch * gradCstretch;
     float3 deltaP2 =  (cv2.invmass * tmp) * Cstretch * gradCstretch;
     
-    if (ID == 0) {
-        //printf("deltaP1 = [%f, %f, %f]", deltaP1.x, deltaP1.y, deltaP1.z);
-        //printf(", deltaP2 = [%f, %f, %f]\n", deltaP2.x, deltaP2.y, deltaP2.z);
-    }
+#define DBG_FLOAT3(vec) printf("[%f, %f, %f]\n", vec.x, vec.y, vec.z)
+    
+//    if (ID == 2) {
+//        printf("v1ID=%i\n", v1ID);
+//        printf("p1="); DBG_FLOAT3(p1);
+//        printf("p2="); DBG_FLOAT3(p2);
+//        printf("p2p1="); DBG_FLOAT3(p2p1);
+//        printf("p2p1length=%f\n", p2p1length);
+//        printf("Cstretch=%f\n", Cstretch);
+//        printf("gradCstretch="); DBG_FLOAT3(gradCstretch);
+//        printf("tmp=%f\n", tmp);
+//    }
     
     ///////////////////////
     /// bend constraint ///
@@ -227,11 +254,63 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
         const int v3ID = edge.vertices[2];
         const int v4ID = edge.vertices[3];
         
-        deltaP1 += Float3(0.0f, 0.0f, 0.0f);
-        deltaP2 += Float3(0.0f, 0.0f, 0.0f);
-        const float3 deltaP3 = Float3(0.0f, 0.0f, 0.0f);
-        const float3 deltaP4 = Float3(0.0f, 0.0f, 0.0f);
+        const ClothVertexData cv3   = clothVertices[v3ID];
+        const ClothVertexData cv4   = clothVertices[v4ID];
         
+        // subtract p1 from all positions to get simpler expressions
+        p2 -= p1;
+        
+        const float3 p3 = predictedPositions[v3ID] - p1;
+        const float3 p4 = predictedPositions[v4ID] - p1;
+        p1 = Float3(0.0f, 0.0f, 0.0f);
+        
+        const float3 n1 = normalize(Cross(p2, p3));
+        const float3 n2 = normalize(Cross(p2, p4));
+        const float d = dot(n1, n2);
+        
+        const float3 q3 = (Cross(p2, n2) + Cross(n1, p2) * d) / length(Cross(p2, p3));
+        const float3 q4 = (Cross(p2, n1) + Cross(n2, p2) * d) / length(Cross(p2, p4));
+        const float3 q2 = -(Cross(p3, n2) + Cross(n1, p3) * d) / length(Cross(p2, p3)) - (Cross(p4, n1) + Cross(n2, p4) * d) / length(Cross(p2, p4));
+        const float3 q1 = - q2 - q3 - q4;
+        
+        const float denom = (cv1.invmass * pow(length(q1),2) +
+                           cv2.invmass * pow(length(q2),2) +
+                           cv3.invmass * pow(length(q3),2) +
+                           cv4.invmass * pow(length(q4),2));
+        const float nom = -sqrt(clamp(1 - pow(d, 2), 0.0f, 1.0f)) * (clamped_acos(d) - clothEdge.initialDihedralAngle);
+        const float factor = nom / denom;
+
+        deltaP1 += params.k_bend * cv1.invmass * factor * q1;
+        deltaP2 += params.k_bend * cv2.invmass * factor * q2;
+        const float3 deltaP3 = params.k_bend * cv3.invmass * factor * q3;
+        const float3 deltaP4 = params.k_bend * cv4.invmass * factor * q4;
+
+//        if (ID == 2) {
+//            printf("verts=[%i, %i, %i, %i]", v1ID, v2ID, v3ID, v4ID);
+//            printf("\n");
+//            printf("initialDihedralAngle=%f", clothEdge.initialDihedralAngle);
+//            printf("       dihedralAngle=%f", clamped_acos(d));
+//            printf("\n");
+//            printf("p1="); DBG_FLOAT3(p1);
+//            printf("p2="); DBG_FLOAT3(p2);
+//            printf("p3="); DBG_FLOAT3(p3);
+//            printf("p4="); DBG_FLOAT3(p4);
+//            printf("\n");
+//            printf("n1="); DBG_FLOAT3(n1);
+//            printf("n2="); DBG_FLOAT3(n2);
+//            printf("\n");
+//            printf("q1="); DBG_FLOAT3(q1);
+//            printf("q2="); DBG_FLOAT3(q2);
+//            printf("q3="); DBG_FLOAT3(q3);
+//            printf("\n");
+//            printf("d=%f, nom=%f, denom=%f, factor=%f", d, nom, denom, factor);
+//            printf("\n");
+//            printf("deltaP1="); DBG_FLOAT3(deltaP1);
+//            printf("deltaP2="); DBG_FLOAT3(deltaP2);
+//            printf("deltaP3="); DBG_FLOAT3(deltaP3);
+//            printf("deltaP4="); DBG_FLOAT3(deltaP4);
+//            printf("\n\n");
+//        }
         cmpwise_atomic_add_global_float3(&(positionCorrections[v3ID]), deltaP3);
         cmpwise_atomic_add_global_float3(&(positionCorrections[v4ID]), deltaP4);
     }
@@ -245,6 +324,10 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
  */
 __kernel void correct_predictions(__global float3      *positionCorrections,   // 0
                                __global float3      *predictedPositions) {  // 1
+//    printf("position=[%f, %f, %f]\n correction=[%f, %f, %f]\n",
+//           positionCorrections[ID].x, positionCorrections[ID].y, positionCorrections[ID].z,
+//           predictedPositions[ID].x, predictedPositions[ID].y, predictedPositions[ID].z);
+    
     predictedPositions[ID] += positionCorrections[ID];
     
     // don't forget to reset position correction when we're done!
@@ -257,8 +340,7 @@ float calc_dihedral_angle(const float3 p1,
                           const float3 p4) {
     const float3 n1 = normalize(Cross(p2 - p1, p3 - p1));
     const float3 n2 = normalize(Cross(p2 - p1, p4 - p1));
-
-    return acos(dot(n1, n2));
+    return clamped_acos(dot(n1, n2));
 }
 
 float3 Float3(float x, float y, float z) {
