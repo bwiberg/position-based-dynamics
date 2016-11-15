@@ -3,11 +3,6 @@
  * of the Vertex struct in src/geometry/geometry.hpp
  */
 typedef struct def_Vertex {
-//    float3 position;
-//    float3 normal;
-//    float2 texCoord;
-//    float4 color;
-//    float data[12];
     float position[3];
     float normal[3];
     float texCoord[2];

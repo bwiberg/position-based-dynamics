@@ -15,7 +15,7 @@ typedef struct def_Vertex {
  */
 typedef struct def_Edge {
     int triangles[2];
-    uint vertices[2];
+    int vertices[4]; // [p1, p2, p3, p4] from the PBD paper
 } Edge;
 
 /**

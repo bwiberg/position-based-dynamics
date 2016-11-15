@@ -34,8 +34,13 @@ namespace pbd {
      * in kernels/common/Mesh.cl
      */
     struct ATTR_PACKED Edge {
+        // [0] is always valid
+        // [1] can be -1, which means that this edge belongs to a single triangle
         int triangles[2];
-        uint vertices[2];
+
+        // [0, 1] are the vertices that make up the edge
+        // [2, 3] are the remaining vertices of the connecting triangles
+        int vertices[4];
     };
 
     /**

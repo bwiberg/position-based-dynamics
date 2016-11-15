@@ -99,17 +99,43 @@ namespace pbd {
 #define NO_TRIANGLE -1
             Edge newedge;
             uint count1 = 0, count2 = 0;
+            Triangle TL, TR;
             for (const auto &entry : edgeTriangles){
 
                 const auto &edge_ = entry.first;
                 const auto &tris = entry.second;
 
-                newedge.vertices[0] = edge_.first;
-                newedge.vertices[1] = edge_.second;
-
                 assert(tris.size() == 1 || tris.size() == 2);
+
                 newedge.triangles[0] = tris[0];
-                newedge.triangles[1] = (tris.size() == 2 ? tris[1] : NO_TRIANGLE);
+                TL = triangles[newedge.triangles[0]];
+
+                // "p1" in the PBD-paper
+                const int p1 = edge_.first;
+                newedge.vertices[0] = p1;
+                // "p2" in the PBD-paper
+                const int p2 = edge_.second;
+                newedge.vertices[1] = p2;
+
+                int p3;
+                if      (TL.vertices[0] != p1 && TL.vertices[0] != p2) p3 = TL.vertices[0];
+                else if (TL.vertices[1] != p1 && TL.vertices[1] != p2) p3 = TL.vertices[1];
+                else                                                   p3 = TL.vertices[2];
+
+                int p4 = -1;
+                if (tris.size() == 2) {
+                    newedge.triangles[1] = tris[1];
+                    TR = triangles[newedge.triangles[1]];
+
+                    if      (TR.vertices[0] != p1 && TR.vertices[0] != p2) p4 = TR.vertices[0];
+                    else if (TR.vertices[1] != p1 && TR.vertices[1] != p2) p4 = TR.vertices[1];
+                    else                                                   p4 = TR.vertices[2];
+                } else {
+                    newedge.triangles[1] = NO_TRIANGLE;
+                }
+
+                newedge.vertices[2] = p3;
+                newedge.vertices[3] = p4;
 
                 edgevector.push_back(newedge);
 

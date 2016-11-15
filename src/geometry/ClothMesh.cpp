@@ -16,6 +16,7 @@ namespace pbd {
               mVertexClothBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
               mVertexVelocitiesBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
               mVertexPredictedPositionsBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
+              mVertexPositionCorrectionsBuffer(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
               mVertexClothData(clothVertexData),
               mEdgeClothData(clothEdgeData),
               mTriangleClothData(clothTriangleData) {}
@@ -63,6 +64,9 @@ namespace pbd {
 
         mVertexPredictedPositionsBuffer.bind();
         mVertexPredictedPositionsBuffer.bufferData(numVertices() * sizeof(glm::vec4), velocities.data());
+
+        mVertexPositionCorrectionsBuffer.bind();
+        mVertexPositionCorrectionsBuffer.bufferData(numVertices() * sizeof(glm::vec4), velocities.data());
     }
 
     void ClothMesh::generateBuffersCL(cl::Context &context) {
@@ -77,6 +81,8 @@ namespace pbd {
                                                       sizeof(ClothTriangleData) * numTriangles()));
         OCL_CHECK(mVertexPredictedPositionsBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE,
                                                                    mVertexPredictedPositionsBuffer.ID()));
+        OCL_CHECK(mVertexPositionCorrectionsBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE,
+                                                                   mVertexPositionCorrectionsBuffer.ID()));
         OCL_CHECK(mVertexInBinPosCL = cl::Buffer(context, CL_MEM_READ_WRITE,
                                                  sizeof(cl_uint) * numVertices(),
                                                  (void*)0, CL_ERROR));

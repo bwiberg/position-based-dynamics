@@ -7,7 +7,7 @@ typedef struct def_Vertex {
 
 typedef struct def_Edge {
     int triangles[2];
-    uint vertices[2];
+    int vertices[4]; // [p1, p2, p3, p4] from the PBD paper
 } Edge;
 
 typedef struct def_Triangle {
@@ -58,10 +58,10 @@ void atomic_add_global_float(volatile __global float *addr, float val);
 /**
  * For every triangle
  */
-__kernel void calc_cloth_mass(__global const Vertex      *vertices,          // 0
-                              __global ClothVertexData   *clothVertices,     // 1
-                              __global const Triangle    *triangles,         // 2
-                              __global ClothTriangleData *clothTriangles) {  // 3
+__kernel void calc_cloth_mass(__global const Vertex                 *vertices,          // 0
+                              volatile __global ClothVertexData     *clothVertices,     // 1
+                              __global const Triangle               *triangles,         // 2
+                              __global ClothTriangleData            *clothTriangles) {  // 3
 
     const Triangle triangle = triangles[ID];
 
@@ -123,8 +123,8 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
 
     const Edge thisedge = edges[ID];
 
-    const uint p1ID = thisedge.vertices[0];
-    const uint p2ID = thisedge.vertices[1];
+    const int p1ID = thisedge.vertices[0];
+    const int p2ID = thisedge.vertices[1];
 
     const float3 p1 = POSITION(vertices[p1ID]);
     const float3 p2 = POSITION(vertices[p2ID]);
@@ -142,20 +142,9 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
         return;
     };
 
-    /// calc dihedral angle
-    const Triangle TL = triangles[thisedge.triangles[0]];
-    const Triangle TR = triangles[thisedge.triangles[1]];
-
-    // find the vertices in the triangles that aren't p1 and p2
-    uint p3ID, p4ID;
-    if      (TL.vertices[0] != p1ID && TL.vertices[0] != p2ID) p3ID = TL.vertices[0];
-    else if (TL.vertices[1] != p1ID && TL.vertices[1] != p2ID) p3ID = TL.vertices[1];
-    else if (TL.vertices[2] != p1ID && TL.vertices[2] != p2ID) p3ID = TL.vertices[2];
-
-    if      (TR.vertices[0] != p1ID && TR.vertices[0] != p2ID) p4ID = TR.vertices[0];
-    else if (TR.vertices[1] != p1ID && TR.vertices[1] != p2ID) p4ID = TR.vertices[1];
-    else if (TR.vertices[2] != p1ID && TR.vertices[2] != p2ID) p4ID = TR.vertices[2];
-
+    const int p3ID = thisedge.vertices[2];
+    const int p4ID = thisedge.vertices[3];
+    
     const float3 p3 = POSITION(vertices[p3ID]);
     const float3 p4 = POSITION(vertices[p4ID]);
 
@@ -171,10 +160,36 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
 ////////////  //////////// POSITION CORRECTION KERNELS ////////////  ////////////
 ////////////  /////////////////////////////////////////////////////  ////////////
 
-//__kernel void clip_to_planes(__global Vertex                    *vertices,      // 0
-//                             __global const PlanarConstraint    *constraints) { // 1
 __kernel void clip_to_planes(__global Vertex *vertices) {
     vertices[ID].position[1] = max(vertices[ID].position[1], 0.0f);
+}
+
+/**
+ * For every edge
+ */
+__kernel void calc_position_corrections(__global const Vertex               *vertices,              // 0
+                                     __global const ClothVertexData      *clothVertices,         // 1
+                                     __global const Edge                 *edges,                 // 2
+                                     __global const ClothEdgeData        *clothEdges,            // 3
+                                     __global const Triangle             *triangles,             // 4
+                                     __global const ClothTriangleData    *clothTriangles,        // 5
+                                     __global const float3               *predictedPositions,    // 6
+                                     __global float3                     *positionCorrections) { // 7
+    
+    const Edge edge                 = edges[ID];
+    const ClothEdgeData clothEdge   = clothEdges[ID];
+    
+    //const Vertex v1 = edge.vertices[0];
+    //const Vertex v2 = edge.vertices[1];
+    
+    //const float3 p1 = POSITION(v1);
+    //const float3 p2 = POSITION(v2);
+    
+    /// stretch constraint
+    //const float Cstretch = length(p1 - p2) - clothEdge.initialLength;
+    
+    
+    
 }
 
 float calc_dihedral_angle(const float3 p1,
