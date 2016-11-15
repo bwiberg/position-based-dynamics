@@ -26,6 +26,7 @@ namespace pbd {
     ClothSimulationScene::ClothSimulationScene(cl::Context &context, cl::Device &device, cl::CommandQueue &queue)
             : BaseScene(context, device, queue) {
         mCurrentSetupFile = RESOURCEPATH("setups/simple.json");
+        mParams = ClothSimParams::ReadFromFile(RESOURCEPATH("params/default.json"));
         createCamera();
         loadKernels();
 
@@ -125,6 +126,27 @@ namespace pbd {
         mLabelAverageFrameTime = new Label(win, "");
         mLabelFPS = new Label(win, "");
         updateTimeLabelsInGUI(0.0);
+
+        /// Cloth simulation parameters GUI
+        FormHelper *gui = new FormHelper(screen);
+        gui->addWindow(Eigen::Vector2i(screen->width() - 200, 15), "Cloth parameters");
+
+        gui->addButton("Load", [&, gui] {
+            std::string filename = file_dialog({ {"json", "Javascript Object Notation"},
+                                                 {"json", "Javascript Object Notation"} }, false);
+            mParams = ClothSimParams::ReadFromFile(filename);
+            gui->refresh();
+        });
+        gui->addButton("Save", [&, gui] {
+            std::string filename = file_dialog({ {"json", "Javascript Object Notation"},
+                                                 {"json", "Javascript Object Notation"} }, true);
+            mParams.writeToFile(filename);
+        });
+
+        gui->addVariable("Projection steps", mParams.numSubSteps);
+        gui->addVariable("Delta time (s)", mParams.deltaTime);
+        gui->addVariable("Stretch constant", mParams.k_stretch);
+        gui->addVariable("Bend constant", mParams.k_bend);
     }
 
     void ClothSimulationScene::reset() {
@@ -177,7 +199,7 @@ namespace pbd {
             OCL_CALL(mSetPositionsToPredicted->setArg(1, clothmesh->mVertexBufferCL));
             ENQUEUE_VERTICES(mSetPositionsToPredicted, clothmesh);
         }
-        
+
         for (auto clothmesh : mClothMeshes) {
             mClipToPlanes->setArg(0, clothmesh->mVertexBufferCL);
             ENQUEUE_VERTICES(mClipToPlanes, clothmesh);

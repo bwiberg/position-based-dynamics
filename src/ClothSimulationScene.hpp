@@ -15,6 +15,7 @@
 #include <geometry/Mesh.hpp>
 
 #include <simulation/Grid.hpp>
+#include <simulation/ClothSimParams.hpp>
 
 namespace pbd {
     /// @brief //todo add brief description to FluidScene
@@ -78,6 +79,12 @@ namespace pbd {
         std::vector<cl::Memory> mMemObjects;
 
         uint mFrameCounter;
+
+        ////////////////////////
+        /// SIMULATION STUFF ///
+        ////////////////////////
+
+        ClothSimParams mParams;
 
         std::unique_ptr<cl::Program> mPredictPositionsProgram;
         std::unique_ptr<cl::Kernel> mPredictPositions;
