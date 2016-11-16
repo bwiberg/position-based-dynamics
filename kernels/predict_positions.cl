@@ -31,6 +31,20 @@ inline float3 Float3(float x, float y, float z) {
 
 #define POSITION(vertex) Float3(vertex.position[0], vertex.position[1], vertex.position[2])
 
+//#define __DEBUG__
+
+#ifdef __DEBUG__
+#define DBG(prefix, _float) printf("%s%f\n", prefix, _float)
+#define DBG3(prefix, vec3) printf("%s[%f, %f, %f]\n", prefix, vec3.x, vec3.y, vec3.z)
+#define DBG_IF_ID(id, prefix, _float) if (get_global_id(0) == id) printf("%s%f\n", prefix, _float)
+#define DBG3_IF_ID(id, prefix, vec3) if (get_global_id(0) == id) printf("%s[%f, %f, %f]\n", prefix, vec3.x, vec3.y, vec3.z)
+#else
+#define DBG(prefix, _float) //
+#define DBG3(prefix, vec3) //
+#define DBG_IF_ID(id, prefix, _float) //
+#define DBG3_IF_ID(id, prefix, vec3) //
+#endif
+
 __kernel void predict_positions(__global float3         *predictedPositions, // 0
                                 __global float3         *velocities,         // 1
                                 __global const Vertex   *vertices,           // 2
@@ -38,27 +52,19 @@ __kernel void predict_positions(__global float3         *predictedPositions, // 
                                 const float             deltaTime) {         // 4
 
     const float3 origposition = POSITION(vertices[ID]);
+    DBG3_IF_ID(3, "origposition=", origposition);
     
     const float factor = clothVertices[ID].invmass * clothVertices[ID].mass;
+    DBG_IF_ID(3, "factor=", factor);
     
     float3 velocity = velocities[ID];
-    if (ID == 1) {
-        printf("pre-g  velocity=[%f, %f, %f]\n", velocity.x, velocity.y, velocity.z);
-    }
+    DBG3_IF_ID(3, "origvelocity=", velocity);
+    
     velocity.y -= factor * deltaTime * 9.82f;
-    if (ID == 1) {
-        printf("post-g velocity=[%f, %f, %f]\n", velocity.x, velocity.y, velocity.z);
-    }
+    DBG3_IF_ID(3, "newvelocity =", velocity);
         
     const float3 newposition = origposition + factor * deltaTime * velocity;
     
-//    printf("ID=%i\nposition0=[%f, %f, %f]\nposition1=[%f, %f, %f]\nvelocity0=[%f, %f, %f]\nvelocity1=[%f, %f, %f]\n",
-//           ID,
-//           POSITION(vertices[ID]).x, POSITION(vertices[ID]).y, POSITION(vertices[ID]).z,
-//           position.x, position.y, position.z,
-//           velocities[ID].x, velocities[ID].y, velocities[ID].z,
-//           velocity.x, velocity.y, velocity.z);
-//    velocities[ID] = velocity;
     predictedPositions[ID] = newposition;
 }
 
@@ -71,12 +77,10 @@ __kernel void set_positions_to_predicted(__global const float3  *predictedPositi
     const float3 newposition = predictedPositions[ID];
     const float3 velocity = (newposition - origposition) / deltaTime;
     
-    if (ID == 1) {
-        //printf("origposition=[%f, %f, %f]\n", origposition.x, origposition.y, origposition.z);
-        //printf("newposition =[%f, %f, %f]\n", newposition.x, newposition.y, newposition.z);
-        printf("velocity    =[%f, %f, %f]\n", velocity.x, velocity.y, velocity.z);
-    }
-
+    DBG3_IF_ID(3, "origposition=", origposition);
+    DBG3_IF_ID(3, "velocity    =", velocity);
+    DBG3_IF_ID(3, "newposition =", newposition);
+    
     velocities[ID] = velocity;
     
     vertices[ID].position[0] = newposition.x;

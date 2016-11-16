@@ -72,6 +72,20 @@ void cmpwise_atomic_add_global_float3(volatile __global float3 *addr, float3 val
 
 #define clamped_acos(x) acos(clamp(x, -0.99999999f, 0.99999999f))
 
+//#define __DEBUG__
+
+#ifdef __DEBUG__
+#define DBG(prefix, _float) printf("%s%f\n", prefix, _float)
+#define DBG3(prefix, vec3) printf("%s[%f, %f, %f]\n", prefix, vec3.x, vec3.y, vec3.z)
+#define DBG_IF_ID(id, prefix, _float) if (get_global_id(0) == id) printf("%s%f\n", prefix, _float)
+#define DBG3_IF_ID(id, prefix, vec3) if (get_global_id(0) == id) printf("%s[%f, %f, %f]\n", prefix, vec3.x, vec3.y, vec3.z)
+#else
+#define DBG(prefix, _float) //
+#define DBG3(prefix, vec3) //
+#define DBG_IF_ID(id, prefix, _float) //
+#define DBG3_IF_ID(id, prefix, vec3) //
+#endif
+
 
 ////////////  ///////////////////////////////////////  ////////////
 ////////////  //////////// SETUP KERNELS ////////////  ////////////
@@ -101,10 +115,8 @@ __kernel void calc_cloth_mass(__global const Vertex                 *vertices,  
 
     const float triangleMass = 0.5f * length(Cross(AB, AC));
 
-    if (ID < 6) {
-        printf("calc_cloth_mass, ID=%i, triangleMass=%f\n", ID, triangleMass);
-    }
-
+    DBG_IF_ID(6, "triangleMass", triangleMass);
+    
     // save this mass into the triangle's memory
     clothTriangles[ID].mass = triangleMass;
 
@@ -127,11 +139,6 @@ __kernel void calc_cloth_mass(__global const Vertex                 *vertices,  
  */
 __kernel void calc_inverse_mass(__global ClothVertexData *clothVertices) {
     clothVertices[ID].invmass = 1.0f / clothVertices[ID].mass;
-
-    if (ID < 6) {
-    printf("calc_inverse_mass, ID=%i, mass=%f, invmass=%f\n", ID,
-            clothVertices[ID].mass, clothVertices[ID].invmass);
-    }
 }
 
 __kernel void fix_vertex(__global ClothVertexData *clothVertices,
@@ -163,11 +170,6 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
 
     if (thisedge.triangles[1] == -1) {
         clothEdges[ID].initialDihedralAngle = 0.0f;
-        if (ID < 6) {
-            printf("calc_edge_properties, ID=%i, initialLength=%f, dihedralAngle=%f\n",
-                    ID, clothEdges[ID].initialLength, clothEdges[ID].initialDihedralAngle);
-        }
-
         return;
     };
 
@@ -178,11 +180,6 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
     const float3 p4 = POSITION(vertices[p4ID]);
     
     clothEdges[ID].initialDihedralAngle = calc_dihedral_angle(p1, p2, p3, p4);
-    
-    if (ID < 6) {
-        printf("calc_edge_properties, ID=%i, initialLength=%f, dihedralAngle=%f\n",
-               ID, clothEdges[ID].initialLength, clothEdges[ID].initialDihedralAngle);
-    }
 }
 
 ////////////  /////////////////////////////////////////////////////  ////////////
@@ -190,7 +187,22 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
 ////////////  /////////////////////////////////////////////////////  ////////////
 
 __kernel void clip_to_planes(__global float3 *predictedPositions) {
-    predictedPositions[ID].y = max(predictedPositions[ID].y, 0.02f);
+    const float3 predictedPosition = predictedPositions[ID];
+    
+    if (isnan(predictedPosition.x)) {
+        printf("OH SNAP, ID=%i\n", ID);
+    }
+    
+    const float clippedY = max(predictedPosition.y, 0.02f);
+    const float3 clippedPosition = Float3(predictedPosition.x, clippedY, predictedPosition.z);
+    
+    DBG3_IF_ID(2, "predictedPosition=", predictedPosition);
+    DBG_IF_ID(2, "clippedY         =", clippedY);
+    DBG3_IF_ID(2, "clippedPosition  =", clippedPosition);
+    
+    predictedPositions[ID] = clippedPosition;
+    
+    DBG3_IF_ID(2, "clippedPosition =", predictedPositions[ID]);
 }
 
 /**
@@ -232,20 +244,15 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
     
     float3 deltaP1 = -(cv1.invmass * tmp) * Cstretch * gradCstretch;
     float3 deltaP2 =  (cv2.invmass * tmp) * Cstretch * gradCstretch;
-    
-#define DBG_FLOAT3(vec) printf("[%f, %f, %f]\n", vec.x, vec.y, vec.z)
-    
-//    if (ID == 2) {
-//        printf("v1ID=%i\n", v1ID);
-//        printf("p1="); DBG_FLOAT3(p1);
-//        printf("p2="); DBG_FLOAT3(p2);
-//        printf("p2p1="); DBG_FLOAT3(p2p1);
-//        printf("p2p1length=%f\n", p2p1length);
-//        printf("Cstretch=%f\n", Cstretch);
-//        printf("gradCstretch="); DBG_FLOAT3(gradCstretch);
-//        printf("tmp=%f\n", tmp);
-//    }
-    
+
+    DBG3_IF_ID(2, "p1=", p1);
+    DBG3_IF_ID(2, "p2=", p2);
+    DBG3_IF_ID(2, "p2p1=", p2p1);
+    DBG_IF_ID(2, "length(p2p1)=", p2p1length);
+    DBG_IF_ID(2, "Cstretch=", Cstretch);
+    DBG3_IF_ID(2, "gradCstretch=", gradCstretch);
+    DBG_IF_ID(2, "tmp=", tmp);
+
     ///////////////////////
     /// bend constraint ///
     ///////////////////////
@@ -285,32 +292,23 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
         const float3 deltaP3 = params.k_bend * cv3.invmass * factor * q3;
         const float3 deltaP4 = params.k_bend * cv4.invmass * factor * q4;
 
-//        if (ID == 2) {
-//            printf("verts=[%i, %i, %i, %i]", v1ID, v2ID, v3ID, v4ID);
-//            printf("\n");
-//            printf("initialDihedralAngle=%f", clothEdge.initialDihedralAngle);
-//            printf("       dihedralAngle=%f", clamped_acos(d));
-//            printf("\n");
-//            printf("p1="); DBG_FLOAT3(p1);
-//            printf("p2="); DBG_FLOAT3(p2);
-//            printf("p3="); DBG_FLOAT3(p3);
-//            printf("p4="); DBG_FLOAT3(p4);
-//            printf("\n");
-//            printf("n1="); DBG_FLOAT3(n1);
-//            printf("n2="); DBG_FLOAT3(n2);
-//            printf("\n");
-//            printf("q1="); DBG_FLOAT3(q1);
-//            printf("q2="); DBG_FLOAT3(q2);
-//            printf("q3="); DBG_FLOAT3(q3);
-//            printf("\n");
-//            printf("d=%f, nom=%f, denom=%f, factor=%f", d, nom, denom, factor);
-//            printf("\n");
-//            printf("deltaP1="); DBG_FLOAT3(deltaP1);
-//            printf("deltaP2="); DBG_FLOAT3(deltaP2);
-//            printf("deltaP3="); DBG_FLOAT3(deltaP3);
-//            printf("deltaP4="); DBG_FLOAT3(deltaP4);
-//            printf("\n\n");
-//        }
+        DBG_IF_ID(2, "initialDihedralAngle=", clothEdge.initialDihedralAngle);
+        DBG_IF_ID(2, "       dihedralAngle=", clamped_acos(d));
+        DBG3_IF_ID(2, "p1=", p1);
+        DBG3_IF_ID(2, "p2=", p2);
+        DBG3_IF_ID(2, "p3=", p3);
+        DBG3_IF_ID(2, "p4=", p4);
+        DBG3_IF_ID(2, "n1=", n1);
+        DBG3_IF_ID(2, "n2=", n2);
+        DBG_IF_ID(2, "d=", d);
+        DBG_IF_ID(2, "nom=", nom);
+        DBG_IF_ID(2, "denom=", denom);
+        DBG_IF_ID(2, "factor=", factor);
+        DBG3_IF_ID(2, "deltaP1=", deltaP1);
+        DBG3_IF_ID(2, "deltaP2=", deltaP2);
+        DBG3_IF_ID(2, "deltaP3=", deltaP3);
+        DBG3_IF_ID(2, "deltaP4=", deltaP4);
+
         cmpwise_atomic_add_global_float3(&(positionCorrections[v3ID]), deltaP3);
         cmpwise_atomic_add_global_float3(&(positionCorrections[v4ID]), deltaP4);
     }
@@ -324,12 +322,21 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
  */
 __kernel void correct_predictions(__global float3      *positionCorrections,   // 0
                                __global float3      *predictedPositions) {  // 1
-//    printf("position=[%f, %f, %f]\n correction=[%f, %f, %f]\n",
-//           positionCorrections[ID].x, positionCorrections[ID].y, positionCorrections[ID].z,
-//           predictedPositions[ID].x, predictedPositions[ID].y, predictedPositions[ID].z);
+
+    const float3 predicted = predictedPositions[ID];
+    float3 correction = positionCorrections[ID];
+    if (isnan(correction.x)) correction.x = 0.0f;
+    if (isnan(correction.y)) correction.y = 0.0f;
+    if (isnan(correction.z)) correction.z = 0.0f;
     
-    predictedPositions[ID] += positionCorrections[ID];
-    
+    const float3 corrected = predicted + corrected;
+
+    predictedPositions[ID] += correction;
+
+    DBG3_IF_ID(2, "predicted =", predicted);
+    DBG3_IF_ID(2, "correction=", correction);
+    DBG3_IF_ID(2, "corrected =", corrected);
+
     // don't forget to reset position correction when we're done!
     positionCorrections[ID] = Float3(0.0f, 0.0f, 0.0f);
 }

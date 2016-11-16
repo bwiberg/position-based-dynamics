@@ -228,6 +228,8 @@ namespace pbd {
         OCL_CALL(mQueue.enqueueReleaseGLObjects(&mMemObjects, NULL, &event));
         OCL_CALL(event.wait());
 
+        std::cout << std::endl;
+
         double timeEnd = glfwGetTime();
         while (mSimulationTimes.size() > NUM_AVG_SIM_TIMES) {
             mSimulationTimes.pop_back();
