@@ -152,7 +152,16 @@ namespace pbd {
         if (mIsGrabbingCloth) {
             cl_float3 impulse = {1.0f, 0.0f, 0.0f, 0.0f};
             mGrabbedVertexIndex = 1;
-            mGrabbedClothMesh = mClothMeshes[0];
+
+            cl_float3 velocity;
+            mQueue.enqueueReadBuffer(mGrabbedClothMesh->mVertexVelocitiesBufferCL, true,
+                                     sizeof(cl_float3) * mGrabbedVertexIndex, sizeof(cl_float3), &velocity);
+
+            // apply impulse toward cursor ray
+
+            mQueue.enqueueWriteBuffer(mGrabbedClothMesh->mVertexVelocitiesBufferCL, true,
+                                      sizeof(cl_float3) * mGrabbedVertexIndex, sizeof(cl_float3), &velocity);
+
 
             OCL_CALL(mApplyGrabImpulse->setArg(0, mGrabbedClothMesh->mVertexVelocitiesBufferCL));
             OCL_CALL(mApplyGrabImpulse->setArg(1, impulse));
