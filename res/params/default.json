@@ -2,5 +2,5 @@
   "deltaTime": 0.01,
   "k_bend": 0.05,
   "k_stretch": 0.5,
-  "numSubSteps": 6
+  "numSubSteps": 20
 }
