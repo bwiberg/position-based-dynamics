@@ -5,10 +5,11 @@
 
 #include <bwgl/bwgl.hpp>
 
-#include "rendering/BaseShader.hpp"
-#include "rendering/Camera.hpp"
-#include "rendering/light/DirectionalLight.hpp"
-#include "rendering/light/PointLight.hpp"
+#include <rendering/BaseShader.hpp>
+#include <rendering/Camera.hpp>
+#include <rendering/light/DirectionalLight.hpp>
+#include <rendering/light/PointLight.hpp>
+#include <rendering/MeshObject.hpp>
 
 #include <deque>
 #include <rendering/RenderObject.hpp>
@@ -45,6 +46,10 @@ namespace pbd {
     private:
         void createCamera();
 
+        void createAxis();
+
+        void loadMarker();
+
         void loadShaders();
 
         void loadKernels();
@@ -64,6 +69,7 @@ namespace pbd {
         SceneSetup mCurrentSetup;
 
         std::shared_ptr<clgl::Camera> mCamera;
+        std::shared_ptr<clgl::MeshObject> mMarker;
 
         std::shared_ptr<clgl::SceneObject> mCameraRotator;
 
@@ -75,6 +81,9 @@ namespace pbd {
         std::map<std::string, std::shared_ptr<clgl::BaseShader>> mShaders;
 
         bool mIsRotatingCamera;
+        bool mIsGrabbingCloth;
+        std::shared_ptr<pbd::ClothMesh> mGrabbedClothMesh;
+        uint mGrabbedVertexIndex;
 
         std::vector<cl::Memory> mMemObjects;
 
@@ -87,6 +96,8 @@ namespace pbd {
         ClothSimParams mParams;
 
         std::unique_ptr<cl::Program> mPredictPositionsProgram;
+        std::unique_ptr<cl::Kernel> mCalcDistToLine;
+        std::unique_ptr<cl::Kernel> mApplyGrabImpulse;
         std::unique_ptr<cl::Kernel> mPredictPositions;
         std::unique_ptr<cl::Kernel> mSetPositionsToPredicted;
 

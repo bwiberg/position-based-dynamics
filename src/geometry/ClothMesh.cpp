@@ -83,6 +83,9 @@ namespace pbd {
                                                                    mVertexPredictedPositionsBuffer.ID()));
         OCL_CHECK(mVertexPositionCorrectionsBufferCL = cl::BufferGL(context, CL_MEM_READ_WRITE,
                                                                    mVertexPositionCorrectionsBuffer.ID()));
+        OCL_CHECK(mDistToLineBufferCL = cl::Buffer(context, CL_MEM_READ_WRITE,
+                                                   sizeof(cl_float) * numVertices(),
+                                                   (void*)0, CL_ERROR));
         OCL_CHECK(mVertexInBinPosCL = cl::Buffer(context, CL_MEM_READ_WRITE,
                                                  sizeof(cl_uint) * numVertices(),
                                                  (void*)0, CL_ERROR));

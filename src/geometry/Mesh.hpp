@@ -157,6 +157,7 @@ namespace pbd {
 
         cl::Buffer mTriangleClothBufferCL;
         cl::Buffer mEdgeClothBufferCL;
+        cl::Buffer mDistToLineBufferCL;
 
         cl::Buffer mVertexInBinPosCL;
     };

@@ -45,6 +45,36 @@ inline float3 Float3(float x, float y, float z) {
 #define DBG3_IF_ID(id, prefix, vec3) //
 #endif
 
+/**
+ * For every vertex
+ */
+__kernel void calc_dist_to_line(__global const Vertex   *vertices,          // 0
+                                __global float          *distances,         // 1
+                                const float3            lineOrigin,         // 2
+                                const float3            lineDirection) {    // 3
+
+    float3 position = POSITION(vertices[ID]);
+    position.y = -position.y;
+
+    const float3 relposition = position - lineOrigin;
+
+    const float3 relposition_parallel_line = lineDirection * dot(lineDirection, relposition);
+    const float3 relposition_orthogonal_line = relposition - relposition_parallel_line;
+
+    distances[ID] = length(relposition_orthogonal_line);
+}
+
+/**
+ * For every vertex
+ */
+__kernel void apply_grab_impulse(__global float3    *velocities,    // 0
+                                 const float3   impulse,        // 1
+                                 uint           grabbedID) {    // 2
+    if (ID != grabbedID) return;
+    
+    velocities[ID] += impulse;
+}
+
 __kernel void predict_positions(__global float3         *predictedPositions, // 0
                                 __global float3         *velocities,         // 1
                                 __global const Vertex   *vertices,           // 2

@@ -13,6 +13,7 @@
 #include <util/cl_util.hpp>
 
 #include <glm/ext.hpp>
+#include <OpenCL/opencl.h>
 
 #define ENQUEUE(kernelptr, clothptr, what) \
         OCL_CALL(mQueue.enqueueNDRangeKernel(*kernelptr, cl::NullRange, \
@@ -28,49 +29,9 @@ namespace pbd {
         mCurrentSetupFile = RESOURCEPATH("setups/simple.json");
         mParams = ClothSimParams::ReadFromFile(RESOURCEPATH("params/default.json"));
         createCamera();
+        createAxis();
+        loadMarker();
         loadKernels();
-
-        {
-            mAxisShader = std::make_shared<clgl::BaseShader>(
-                    std::unordered_map<GLuint, std::string>{{GL_VERTEX_SHADER,   SHADERPATH("axis.vert")},
-                                                            {GL_FRAGMENT_SHADER, SHADERPATH("axis.frag")}});
-            mAxisShader->compile();
-
-            // create axis geometry
-            const glm::vec3 positions[6] = {
-                    glm::vec3(0.0f),
-                    glm::vec3(1.0f, 0.0f, 0.0f),
-                    glm::vec3(0.0f),
-                    glm::vec3(0.0f, 1.0f, 0.0f),
-                    glm::vec3(0.0f),
-                    glm::vec3(0.0f, 0.0f, 1.0f)
-            };
-
-            const glm::vec3 colors[6] = {
-                    glm::vec3(1.0f, 0.0f, 0.0f),
-                    glm::vec3(1.0f, 0.0f, 0.0f),
-                    glm::vec3(0.0f, 1.0f, 0.0f),
-                    glm::vec3(0.0f, 1.0f, 0.0f),
-                    glm::vec3(0.0f, 0.0f, 1.0f),
-                    glm::vec3(0.0f, 0.0f, 1.0f)
-            };
-
-            mAxisPositions = std::make_shared<bwgl::VertexBuffer>(GL_ARRAY_BUFFER);
-            mAxisPositions->bind();
-            mAxisPositions->bufferData(6 * sizeof(glm::vec3), &positions[0]);
-            mAxisPositions->unbind();
-
-            mAxisColors = std::make_shared<bwgl::VertexBuffer>(GL_ARRAY_BUFFER);
-            mAxisColors->bind();
-            mAxisColors->bufferData(6 * sizeof(glm::vec3), &colors[0]);
-            mAxisColors->unbind();
-
-            mAxis = std::make_shared<bwgl::VertexArray>();
-            mAxis->bind();
-            mAxis->addVertexAttribute(*mAxisPositions, 3, GL_FLOAT, GL_FALSE, 0);
-            mAxis->addVertexAttribute(*mAxisColors, 3, GL_FLOAT, GL_FALSE, 0);
-            mAxis->unbind();
-        }
 
         mGridCL = util::make_unique<pbd::Grid>();
         mGridCL->halfDimensions = {1.0f, 1.0f, 1.0f, 0.0f};
@@ -88,6 +49,8 @@ namespace pbd {
                                                                 CL_MEM_READ_WRITE,
                                                                 sizeof(cl_uint) * mGridCL->binCount,
                                                                 (void*)0, CL_ERROR));
+
+        mIsGrabbingCloth = false;
     }
 
     void ClothSimulationScene::addGUI(nanogui::Screen *screen) {
@@ -186,6 +149,17 @@ namespace pbd {
         /// ...
         /// ...
 
+        if (mIsGrabbingCloth) {
+            cl_float3 impulse = {1.0f, 0.0f, 0.0f, 0.0f};
+            mGrabbedVertexIndex = 1;
+            mGrabbedClothMesh = mClothMeshes[0];
+
+            OCL_CALL(mApplyGrabImpulse->setArg(0, mGrabbedClothMesh->mVertexVelocitiesBufferCL));
+            OCL_CALL(mApplyGrabImpulse->setArg(1, impulse));
+            OCL_CALL(mApplyGrabImpulse->setArg(2, mGrabbedVertexIndex));
+            ENQUEUE_VERTICES(mApplyGrabImpulse, mGrabbedClothMesh);
+        }
+
         for (auto clothmesh : mClothMeshes) {
             OCL_CALL(mPredictPositions->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
             OCL_CALL(mPredictPositions->setArg(1, clothmesh->mVertexVelocitiesBufferCL));
@@ -267,6 +241,15 @@ namespace pbd {
         for (auto renderObject : mRenderObjects) {
             renderObject->render(VP);
         }
+        if (mIsGrabbingCloth) {
+            Vertex vertex;
+            mQueue.enqueueReadBuffer(mGrabbedClothMesh->mVertexBufferCL, true, sizeof(Vertex) * mGrabbedVertexIndex, sizeof(Vertex), &vertex);
+            auto position = vertex.position;
+            position.y = -position.y;
+            mMarker->setPosition(position);
+            mMarker->render(VP);
+        }
+
         OGL_CALL(glDisable(GL_DEPTH_TEST));
 
         renderAxes();
@@ -282,8 +265,82 @@ namespace pbd {
     }
 
     bool ClothSimulationScene::mouseButtonEvent(const glm::ivec2 &p, int button, bool down, int modifiers) {
-        if (button == GLFW_MOUSE_BUTTON_LEFT && modifiers == GLFW_MOD_SHIFT) {
-            mIsRotatingCamera = down;
+        if (button != GLFW_MOUSE_BUTTON_LEFT) {
+            return false;
+        }
+
+        if (down && modifiers == GLFW_MOD_ALT) {
+            mIsRotatingCamera = true;
+            return true;
+        }
+
+        if (!down) {
+            mIsRotatingCamera = false;
+            mIsGrabbingCloth = false;
+            return false;
+        }
+
+        /// Step 1: 3D normalized device coordinates
+        const float x = (2.0f * p.x) / mCamera->getScreenDimensions().x - 1.0f;
+        const float y = 1.0f - (2.0f * p.y) / mCamera->getScreenDimensions().y;
+        const float z = 1.0f;
+
+        /// Step 2: 4D homogeneous clip coordinates
+        const glm::vec4 rayClip(x, y, -1.0f, 1.0f);
+
+        /// Step 3: 4D camera coordinates
+        glm::vec4 rayCamera = glm::inverse(mCamera->getPerspectiveTransform()) * rayClip;
+        rayCamera.z = -1.0f;
+        rayCamera.w = 0.0f;
+
+        /// Step 4: 4D world coordinates
+        glm::vec3 rayWorld(mCamera->getTransform() * rayCamera);
+        rayWorld = glm::normalize(rayWorld);
+
+        const glm::vec3 rayOrigin = glm::vec3(mCamera->getParent()->getTransform() * glm::vec4(mCamera->getPosition(), 1.0f));
+
+        std::cout << "RayWorld = " << glm::to_string(rayWorld) << std::endl
+                  << "RayOrigin = " << glm::to_string(rayOrigin) << std::endl;
+
+        cl_float3 rayWorldCL, rayOriginCL;
+        for (uint i = 0; i < 3; ++i) {
+            rayWorldCL.s[i] = rayWorld[i];
+            rayOriginCL.s[i] = rayOrigin[i];
+        }
+
+        std::shared_ptr<ClothMesh> closestcloth = nullptr;
+        std::vector<cl_float> distances;
+        int closestindex = -1;
+        float closestdistance = 1e10;
+
+        for (auto &clothmesh : mClothMeshes) {
+            OCL_CALL(mCalcDistToLine->setArg(0, clothmesh->mVertexBufferCL));
+            OCL_CALL(mCalcDistToLine->setArg(1, clothmesh->mDistToLineBufferCL));
+            OCL_CALL(mCalcDistToLine->setArg(2, rayOriginCL));
+            OCL_CALL(mCalcDistToLine->setArg(3, rayWorldCL));
+            ENQUEUE_VERTICES(mCalcDistToLine, clothmesh);
+
+            distances.reserve(clothmesh->numVertices());
+            mQueue.enqueueReadBuffer(clothmesh->mDistToLineBufferCL, true, 0,
+                                     sizeof(cl_float) * clothmesh->numVertices(), distances.data());
+
+            for (uint i = 0; i < clothmesh->numVertices(); ++i) {
+                std::cout << distances[i] << ", ";
+                if (distances[i] < closestdistance) {
+
+                    closestcloth = clothmesh;
+                    closestdistance = distances[i];
+                    closestindex = i;
+                }
+                std::cout << std::endl;
+            }
+        }
+
+        if (closestcloth) {
+            mIsGrabbingCloth = true;
+            mGrabbedClothMesh = closestcloth;
+            mGrabbedVertexIndex = static_cast<uint>(closestindex);
+            std::cout << "Grabbed vertex index = " << mGrabbedVertexIndex << " at distance = " << closestdistance << std::endl;
             return true;
         }
 
@@ -332,6 +389,12 @@ namespace pbd {
         OCL_ERROR;
 
         mPredictPositionsProgram = util::LoadCLProgram("predict_positions.cl", mContext, mDevice);
+        OCL_CHECK(mCalcDistToLine = util::make_unique<cl::Kernel>(*mPredictPositionsProgram,
+                                                                  "calc_dist_to_line",
+                                                                  CL_ERROR));
+        OCL_CHECK(mApplyGrabImpulse = util::make_unique<cl::Kernel>(*mPredictPositionsProgram,
+                                                                    "apply_grab_impulse",
+                                                                    CL_ERROR));
         OCL_CHECK(mPredictPositions = util::make_unique<cl::Kernel>(*mPredictPositionsProgram,
                                                                     "predict_positions",
                                                                     CL_ERROR));
@@ -498,6 +561,64 @@ namespace pbd {
         mCamera = std::make_shared<clgl::Camera>(glm::uvec2(100, 100), 75);
         mCamera->setPosition(glm::vec3(0.0f, 0.0f, 10.0f));
         clgl::SceneObject::attach(mCameraRotator, mCamera);
+    }
+
+    void ClothSimulationScene::createAxis() {
+        mAxisShader = std::make_shared<clgl::BaseShader>(
+                std::unordered_map<GLuint, std::string>{{GL_VERTEX_SHADER,   SHADERPATH("axis.vert")},
+                                                        {GL_FRAGMENT_SHADER, SHADERPATH("axis.frag")}});
+        mAxisShader->compile();
+
+        // create axis geometry
+        const glm::vec3 positions[6] = {
+                glm::vec3(0.0f),
+                glm::vec3(1.0f, 0.0f, 0.0f),
+                glm::vec3(0.0f),
+                glm::vec3(0.0f, 1.0f, 0.0f),
+                glm::vec3(0.0f),
+                glm::vec3(0.0f, 0.0f, 1.0f)
+        };
+
+        const glm::vec3 colors[6] = {
+                glm::vec3(1.0f, 0.0f, 0.0f),
+                glm::vec3(1.0f, 0.0f, 0.0f),
+                glm::vec3(0.0f, 1.0f, 0.0f),
+                glm::vec3(0.0f, 1.0f, 0.0f),
+                glm::vec3(0.0f, 0.0f, 1.0f),
+                glm::vec3(0.0f, 0.0f, 1.0f)
+        };
+
+        mAxisPositions = std::make_shared<bwgl::VertexBuffer>(GL_ARRAY_BUFFER);
+        mAxisPositions->bind();
+        mAxisPositions->bufferData(6 * sizeof(glm::vec3), &positions[0]);
+        mAxisPositions->unbind();
+
+        mAxisColors = std::make_shared<bwgl::VertexBuffer>(GL_ARRAY_BUFFER);
+        mAxisColors->bind();
+        mAxisColors->bufferData(6 * sizeof(glm::vec3), &colors[0]);
+        mAxisColors->unbind();
+
+        mAxis = std::make_shared<bwgl::VertexArray>();
+        mAxis->bind();
+        mAxis->addVertexAttribute(*mAxisPositions, 3, GL_FLOAT, GL_FALSE, 0);
+        mAxis->addVertexAttribute(*mAxisColors, 3, GL_FLOAT, GL_FALSE, 0);
+        mAxis->unbind();
+    }
+
+    void ClothSimulationScene::loadMarker() {
+        auto shader = std::make_shared<clgl::BaseShader>(
+                std::unordered_map<GLuint, std::string>{{GL_VERTEX_SHADER,   SHADERPATH("marker.vert")},
+                                                        {GL_FRAGMENT_SHADER, SHADERPATH("marker.frag")}});
+        shader->compile();
+
+        mShaders["marker"] = shader;
+
+        auto mesh = MeshLoader::LoadMesh(RESOURCEPATH("models/marker.obj"));
+        mesh->flipNormals();
+        mesh->uploadHostData();
+
+        mMarker = std::make_shared<clgl::MeshObject>(mesh, shader);
+        mMarker->setScale(0.1f);
     }
 
     void ClothSimulationScene::updateTimeLabelsInGUI(double timeSinceLastUpdate) {
