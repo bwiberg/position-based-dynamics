@@ -52,15 +52,6 @@
     },
     {
       "isCloth": false,
-      "path": "models/sphere.obj",
-      "shader": "simple",
-      "position": [2.0, 2.0, 3.0],
-      "orientation": [2.0, 0.0, 0.0],
-      "scale": 1.0,
-      "flipNormals": false
-    },
-    {
-      "isCloth": false,
       "path": "models/plane.obj",
       "shader": "checkerboard",
       "position": [0.0, 0.0, 0.0],
