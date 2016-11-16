@@ -150,23 +150,48 @@ namespace pbd {
         /// ...
 
         if (mIsGrabbingCloth) {
-            cl_float3 impulse = {1.0f, 0.0f, 0.0f, 0.0f};
-            mGrabbedVertexIndex = 1;
+            const glm::vec3 rayOrigin = getCameraWorldPosition();
+            const glm::vec3 rayDirection = getCursorWorldRay();
+            const float fraction = 0.01f;
 
-            cl_float3 velocity;
-            mQueue.enqueueReadBuffer(mGrabbedClothMesh->mVertexVelocitiesBufferCL, true,
-                                     sizeof(cl_float3) * mGrabbedVertexIndex, sizeof(cl_float3), &velocity);
+//            cl_float3 rayOriginCL = {rayOrigin.x, rayOrigin.y, rayOrigin.z};
+//            cl_float3 rayDirectionCL = {rayDirection.x, rayDirection.y, rayDirection.z};
+//
+//            OCL_CALL(mApplyGrabImpulse->setArg(0, mGrabbedClothMesh->mVertexBufferCL));
+//            OCL_CALL(mApplyGrabImpulse->setArg(1, mGrabbedClothMesh->mVertexVelocitiesBufferCL));
+//            OCL_CALL(mApplyGrabImpulse->setArg(2, rayOriginCL));
+//            OCL_CALL(mApplyGrabImpulse->setArg(3, rayDirectionCL));
+//            OCL_CALL(mApplyGrabImpulse->setArg(4, mParams.deltaTime));
+//            OCL_CALL(mApplyGrabImpulse->setArg(5, mGrabbedVertexIndex));
+//            ENQUEUE_VERTICES(mApplyGrabImpulse, mGrabbedClothMesh);
+
+
+            cl_float3 velocityCL = {0.0f, 0.0f, 0.0f, 0.0f};
+            Vertex vertex;
+            mQueue.enqueueReadBuffer(mGrabbedClothMesh->mVertexBufferCL, true,
+                                                 sizeof(Vertex) * mGrabbedVertexIndex, sizeof(Vertex), &vertex);
+
+            glm::vec3 position = vertex.position;
+            position.y = -position.y;
+
+            glm::vec3 relposition = position - rayOrigin;
+            glm::vec3 positionParallelRay = glm::dot(relposition, rayDirection) * rayDirection;
+            glm::vec3 projectedPosition = positionParallelRay + rayOrigin;
+
+#define FRACTION_NEW 0.8f
+#define FRACTION_OLD (1.0f - FRACTION_NEW)
+
+            glm::vec3 newPosition = FRACTION_OLD * position + FRACTION_NEW * projectedPosition;
 
             // apply impulse toward cursor ray
+            vertex.position.x = newPosition.x;
+            vertex.position.y = -newPosition.y;
+            vertex.position.z = newPosition.z;
 
+            mQueue.enqueueWriteBuffer(mGrabbedClothMesh->mVertexBufferCL, true,
+                                      sizeof(Vertex) * mGrabbedVertexIndex, sizeof(Vertex), &vertex);
             mQueue.enqueueWriteBuffer(mGrabbedClothMesh->mVertexVelocitiesBufferCL, true,
-                                      sizeof(cl_float3) * mGrabbedVertexIndex, sizeof(cl_float3), &velocity);
-
-
-            OCL_CALL(mApplyGrabImpulse->setArg(0, mGrabbedClothMesh->mVertexVelocitiesBufferCL));
-            OCL_CALL(mApplyGrabImpulse->setArg(1, impulse));
-            OCL_CALL(mApplyGrabImpulse->setArg(2, mGrabbedVertexIndex));
-            ENQUEUE_VERTICES(mApplyGrabImpulse, mGrabbedClothMesh);
+                                      sizeof(cl_float3) * mGrabbedVertexIndex, sizeof(cl_float3), &velocityCL);
         }
 
         for (auto clothmesh : mClothMeshes) {
@@ -289,24 +314,8 @@ namespace pbd {
             return false;
         }
 
-        /// Step 1: 3D normalized device coordinates
-        const float x = (2.0f * p.x) / mCamera->getScreenDimensions().x - 1.0f;
-        const float y = 1.0f - (2.0f * p.y) / mCamera->getScreenDimensions().y;
-        const float z = 1.0f;
-
-        /// Step 2: 4D homogeneous clip coordinates
-        const glm::vec4 rayClip(x, y, -1.0f, 1.0f);
-
-        /// Step 3: 4D camera coordinates
-        glm::vec4 rayCamera = glm::inverse(mCamera->getPerspectiveTransform()) * rayClip;
-        rayCamera.z = -1.0f;
-        rayCamera.w = 0.0f;
-
-        /// Step 4: 4D world coordinates
-        glm::vec3 rayWorld(mCamera->getTransform() * rayCamera);
-        rayWorld = glm::normalize(rayWorld);
-
-        const glm::vec3 rayOrigin = glm::vec3(mCamera->getParent()->getTransform() * glm::vec4(mCamera->getPosition(), 1.0f));
+        const glm::vec3 rayWorld = getCursorWorldRay();
+        const glm::vec3 rayOrigin = getCameraWorldPosition();
 
         std::cout << "RayWorld = " << glm::to_string(rayWorld) << std::endl
                   << "RayOrigin = " << glm::to_string(rayOrigin) << std::endl;
@@ -357,6 +366,8 @@ namespace pbd {
     }
 
     bool ClothSimulationScene::mouseMotionEvent(const glm::ivec2 &p, const glm::ivec2 &rel, int button, int modifiers) {
+        mCursorPosition = p;
+
         if (mIsRotatingCamera) {
             glm::vec3 eulerAngles = mCameraRotator->getEulerAngles();
             eulerAngles.x += 0.02f * rel.y;
@@ -515,9 +526,9 @@ namespace pbd {
                 OCL_CALL(mCalcInverseMass->setArg(0, cloth->mVertexClothBufferCL));
                 ENQUEUE_VERTICES(mCalcInverseMass, cloth);
 
-                OCL_CALL(mFixVertex->setArg(0, cloth->mVertexClothBufferCL));
-                OCL_CALL(mFixVertex->setArg(1, 0));
-                ENQUEUE_VERTICES(mFixVertex, cloth);
+                //OCL_CALL(mFixVertex->setArg(0, cloth->mVertexClothBufferCL));
+                //OCL_CALL(mFixVertex->setArg(1, 0));
+                //ENQUEUE_VERTICES(mFixVertex, cloth);
 
                 /// kernels/cloth_simulation.cl -> calc_edge_properties
                 OCL_CALL(mCalcEdgeProperties->setArg(0, cloth->mVertexBufferCL));
@@ -628,6 +639,31 @@ namespace pbd {
 
         mMarker = std::make_shared<clgl::MeshObject>(mesh, shader);
         mMarker->setScale(0.1f);
+    }
+
+    glm::vec3 ClothSimulationScene::getCameraWorldPosition() {
+        return glm::vec3(mCamera->getParent()->getTransform() * glm::vec4(mCamera->getPosition(), 1.0f));
+    }
+
+    glm::vec3 ClothSimulationScene::getCursorWorldRay() {
+        /// Step 1: 3D normalized device coordinates
+        const float x = (2.0f * mCursorPosition.x) / mCamera->getScreenDimensions().x - 1.0f;
+        const float y = 1.0f - (2.0f * mCursorPosition.y) / mCamera->getScreenDimensions().y;
+        const float z = 1.0f;
+
+        /// Step 2: 4D homogeneous clip coordinates
+        const glm::vec4 rayClip(x, y, -1.0f, 1.0f);
+
+        /// Step 3: 4D camera coordinates
+        glm::vec4 rayCamera = glm::inverse(mCamera->getPerspectiveTransform()) * rayClip;
+        rayCamera.z = -1.0f;
+        rayCamera.w = 0.0f;
+
+        /// Step 4: 4D world coordinates
+        glm::vec3 rayWorld(mCamera->getTransform() * rayCamera);
+        rayWorld = glm::normalize(rayWorld);
+
+        return rayWorld;
     }
 
     void ClothSimulationScene::updateTimeLabelsInGUI(double timeSinceLastUpdate) {

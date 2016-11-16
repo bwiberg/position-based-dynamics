@@ -80,6 +80,11 @@ namespace pbd {
 
         std::map<std::string, std::shared_ptr<clgl::BaseShader>> mShaders;
 
+        glm::vec3 getCameraWorldPosition();
+
+        glm::vec3 getCursorWorldRay();
+
+        glm::ivec2 mCursorPosition;
         bool mIsRotatingCamera;
         bool mIsGrabbingCloth;
         std::shared_ptr<pbd::ClothMesh> mGrabbedClothMesh;
