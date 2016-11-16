@@ -24,6 +24,7 @@ namespace pbd {
         shader.uniform("VP", VP);
         shader.uniform("MVP", VP * M);
         shader.uniform("M", M);
+        shader.uniform("normalMultiplier", 1.0f);
 
         shader.uniform("HasDiffuseTexture", static_cast<int>(mTexDiffuse.ID != 0));
         if (mTexDiffuse.ID != 0) {

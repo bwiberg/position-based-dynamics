@@ -9,6 +9,8 @@ uniform mat4 M;
 uniform mat4 MVP;
 uniform vec3 WorldEye;
 
+uniform float normalMultiplier;
+
 out vec4 WorldPosition;
 out vec3 Normal;
 out vec2 TexCoord;
@@ -17,6 +19,8 @@ out vec4 Color;
 void main() {
     Normal = mat3(M) * vec3(normal);
     Normal.y = -Normal.y;
+
+    Normal = normalMultiplier * Normal;
 
     TexCoord = texCoord;
     Color = color;

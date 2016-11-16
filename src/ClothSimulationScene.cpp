@@ -228,8 +228,6 @@ namespace pbd {
         OCL_CALL(mQueue.enqueueReleaseGLObjects(&mMemObjects, NULL, &event));
         OCL_CALL(event.wait());
 
-        std::cout << std::endl;
-
         double timeEnd = glfwGetTime();
         while (mSimulationTimes.size() > NUM_AVG_SIM_TIMES) {
             mSimulationTimes.pop_back();
@@ -284,7 +282,7 @@ namespace pbd {
     }
 
     bool ClothSimulationScene::mouseButtonEvent(const glm::ivec2 &p, int button, bool down, int modifiers) {
-        if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT && modifiers == GLFW_MOD_SHIFT) {
             mIsRotatingCamera = down;
             return true;
         }

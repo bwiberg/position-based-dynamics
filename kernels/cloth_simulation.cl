@@ -189,10 +189,6 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
 __kernel void clip_to_planes(__global float3 *predictedPositions) {
     const float3 predictedPosition = predictedPositions[ID];
     
-    if (isnan(predictedPosition.x)) {
-        printf("OH SNAP, ID=%i\n", ID);
-    }
-    
     const float clippedY = max(predictedPosition.y, 0.02f);
     const float3 clippedPosition = Float3(predictedPosition.x, clippedY, predictedPosition.z);
     
