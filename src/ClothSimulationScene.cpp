@@ -359,6 +359,15 @@ namespace pbd {
             mGrabbedClothMesh = closestcloth;
             mGrabbedVertexIndex = static_cast<uint>(closestindex);
             std::cout << "Grabbed vertex index = " << mGrabbedVertexIndex << " at distance = " << closestdistance << std::endl;
+
+            if (modifiers == GLFW_MOD_SHIFT) {
+                // pin this vertex
+                cl_float invmass_ = 0.0f;
+                OCL_CALL(mQueue.enqueueWriteBuffer(mGrabbedClothMesh->mVertexClothBufferCL, true,
+                                                   sizeof(ClothVertexData) * mGrabbedVertexIndex + offsetof(ClothVertexData, invmass),
+                                                   sizeof(cl_float), &invmass_));
+            }
+
             return true;
         }
 
