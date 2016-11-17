@@ -189,7 +189,7 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
 __kernel void clip_to_planes(__global float3 *predictedPositions) {
     const float3 predictedPosition = predictedPositions[ID];
     
-    const float clippedY = max(predictedPosition.y, 0.02f);
+    const float clippedY = max(predictedPosition.y, 0.3f);
     const float3 clippedPosition = Float3(predictedPosition.x, clippedY, predictedPosition.z);
     
     DBG3_IF_ID(2, "predictedPosition=", predictedPosition);
@@ -281,7 +281,7 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
                            cv3.invmass * pow(length(q3),2) +
                            cv4.invmass * pow(length(q4),2));
         const float nom = -sqrt(clamp(1 - pow(d, 2), 0.0f, 1.0f)) * (clamped_acos(d) - clothEdge.initialDihedralAngle);
-        const float factor = nom / denom;
+        const float factor = nom / max(denom, 0.00001f);
 
         deltaP1 += params.k_bend * cv1.invmass * factor * q1;
         deltaP2 += params.k_bend * cv2.invmass * factor * q2;
