@@ -1,3 +1,7 @@
+// // // // // // // // // // // /// // // // // // //
+/// /// /// /// /// /// UNUSED /// /// /// /// /// ///
+// // // /// // // // // // // // // // // // // // //
+
 /**
  * OpenCL representation of a vertex. Matches the memory layout
  * of the Vertex struct in src/geometry/geometry.hpp

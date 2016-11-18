@@ -154,18 +154,6 @@ namespace pbd {
             const glm::vec3 rayDirection = getCursorWorldRay();
             const float fraction = 0.01f;
 
-//            cl_float3 rayOriginCL = {rayOrigin.x, rayOrigin.y, rayOrigin.z};
-//            cl_float3 rayDirectionCL = {rayDirection.x, rayDirection.y, rayDirection.z};
-//
-//            OCL_CALL(mApplyGrabImpulse->setArg(0, mGrabbedClothMesh->mVertexBufferCL));
-//            OCL_CALL(mApplyGrabImpulse->setArg(1, mGrabbedClothMesh->mVertexVelocitiesBufferCL));
-//            OCL_CALL(mApplyGrabImpulse->setArg(2, rayOriginCL));
-//            OCL_CALL(mApplyGrabImpulse->setArg(3, rayDirectionCL));
-//            OCL_CALL(mApplyGrabImpulse->setArg(4, mParams.deltaTime));
-//            OCL_CALL(mApplyGrabImpulse->setArg(5, mGrabbedVertexIndex));
-//            ENQUEUE_VERTICES(mApplyGrabImpulse, mGrabbedClothMesh);
-
-
             cl_float3 velocityCL = {0.0f, 0.0f, 0.0f, 0.0f};
             Vertex vertex;
             mQueue.enqueueReadBuffer(mGrabbedClothMesh->mVertexBufferCL, true,
@@ -466,9 +454,7 @@ namespace pbd {
         mCurrentSetup = SceneSetup::LoadFromJsonString(contents);
         mCurrentSetup.filepath = mCurrentSetupFile;
 
-        mCameraRotator->setEulerAngles(glm::vec3(0.0f, 0.0f, 0.0f));
         mCamera->setFieldOfViewY(mCurrentSetup.camera.fovY);
-        mCamera->setPosition(mCurrentSetup.camera.position);
 
         for (ShaderConfig config : mCurrentSetup.shaders) {
             auto shader = std::make_shared<clgl::BaseShader>(
@@ -642,7 +628,7 @@ namespace pbd {
 
         mShaders["marker"] = shader;
 
-        auto mesh = MeshLoader::LoadMesh(RESOURCEPATH("models/marker.obj"));
+        auto mesh = MeshLoader::LoadMesh(RESOURCEPATH("models/marker/marker.obj"));
         mesh->flipNormals();
         mesh->uploadHostData();
 

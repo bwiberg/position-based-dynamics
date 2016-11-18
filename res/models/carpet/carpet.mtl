@@ -3,8 +3,9 @@ illum 4
 Kd 0.00 0.00 0.00
 Ka 0.00 0.00 0.00
 Tf 1.00 1.00 1.00
-map_Kd carpet.png
-bump carpet-normal.png
+map_Kd carpet/carpet.png
+bump carpet/carpet-normal.png
 Ni 1.00
 Ks 0.50 0.50 0.50
+map_Ks carpet/carpet-specular.png
 Ns 18.00

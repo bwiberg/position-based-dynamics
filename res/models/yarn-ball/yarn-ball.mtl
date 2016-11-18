@@ -1,0 +1,11 @@
+newmtl phong1SG
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+map_Kd yarn-ball/yarn-ball-diffuse.png
+bump yarn-ball/yarn-ball-normal.png
+Ni 1.00
+Ks 0.50 0.50 0.50
+map_Ks yarn-ball/yarn-ball-specular.png
+Ns 18.00

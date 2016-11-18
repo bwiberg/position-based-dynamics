@@ -43,7 +43,7 @@
   "meshes": [
     {
       "isCloth": true,
-      "path": "models/simple.obj",
+      "path": "models/simple/simple.obj",
       "shader": "simple",
       "position": [0.0, 2.0, 0.0],
       "orientation": [1.57, 3.14, 0.0],
@@ -52,7 +52,7 @@
     },
     {
       "isCloth": false,
-      "path": "models/plane.obj",
+      "path": "models/plane/plane.obj",
       "shader": "checkerboard",
       "position": [0.0, 0.0, 0.0],
       "orientation": [0.0, 0.0, 0.0],

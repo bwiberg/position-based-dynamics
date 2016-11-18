@@ -43,16 +43,25 @@
   "meshes": [
     {
       "isCloth": true,
-      "path": "models/carpet.obj",
+      "path": "models/carpet/carpet.obj",
       "shader": "simple",
       "position": [0.0, 2.0, 0.0],
-      "orientation": [1.57, 3.14, 0.0],
+      "orientation": [1.0, 3.14, 0.0],
+      "scale": 2.0,
+      "flipNormals": true
+    },
+    {
+      "isCloth": true,
+      "path": "models/yarn-ball/yarn-ball.obj",
+      "shader": "simple",
+      "position": [2.0, 2.0, 0.0],
+      "orientation": [0.0, 0.0, 0.0],
       "scale": 2.0,
       "flipNormals": true
     },
     {
       "isCloth": false,
-      "path": "models/plane.obj",
+      "path": "models/plane/plane.obj",
       "shader": "checkerboard",
       "position": [0.0, 0.0, 0.0],
       "orientation": [0.0, 0.0, 0.0],

@@ -46,7 +46,9 @@ inline float3 Float3(float x, float y, float z) {
 #endif
 
 /**
- * For every vertex
+ * (runs for every vertex)
+ *
+ * Calculates the distance of each vertex to a world-space line/ray.
  */
 __kernel void calc_dist_to_line(__global const Vertex   *vertices,          // 0
                                 __global float          *distances,         // 1
@@ -58,6 +60,7 @@ __kernel void calc_dist_to_line(__global const Vertex   *vertices,          // 0
 
     const float3 relposition = position - lineOrigin;
 
+    // projects the vertex onto the line
     const float3 relposition_parallel_line = lineDirection * dot(lineDirection, relposition);
     const float3 relposition_orthogonal_line = relposition - relposition_parallel_line;
 
@@ -65,36 +68,10 @@ __kernel void calc_dist_to_line(__global const Vertex   *vertices,          // 0
 }
 
 /**
- * For every vertex
+ * (runs for every vertex)
+ *
+ * Calculates the distance of each vertex to a world-space line/ray.
  */
-__kernel void apply_grab_impulse(__global Vertex   *vertices,    // 0
-                                 __global float3    *velocities,    // 1
-                                 const float3    lineOrigin,    // 2
-                                 const float3    lineDirection, // 3
-                                 const float    deltaTime,      // 4
-                                 uint           grabbedID) {   // 5
-    if (ID != grabbedID) return;
-    
-    float3 position = POSITION(vertices[ID]);
-    position.y = -position.y;
-    
-    const float3 relposition = position - lineOrigin;
-    
-    const float3 relposition_parallel_line = lineDirection * dot(lineDirection, relposition);
-    
-    float3 projectedPosition = relposition_parallel_line + lineOrigin;
-    
-#define BLEND 0.5f
-    
-    const float3 newPosition = (1 - BLEND) * position + BLEND * projectedPosition;
-    
-    vertices[ID].position[0] = newPosition.x;
-    vertices[ID].position[1] = -newPosition.y;
-    vertices[ID].position[2] = newPosition.z;
-    
-    velocities[ID] = Float3(0.0f, 0.0f, 0.0f);
-}
-
 __kernel void predict_positions(__global float3         *predictedPositions, // 0
                                 __global float3         *velocities,         // 1
                                 __global const Vertex   *vertices,           // 2
@@ -118,6 +95,11 @@ __kernel void predict_positions(__global float3         *predictedPositions, // 
     predictedPositions[ID] = newposition;
 }
 
+/**
+ * (runs for every vertex)
+ *
+ * Applies gravity to velocities and predicts positions based on an Euler timestep
+ */
 __kernel void set_positions_to_predicted(__global const float3  *predictedPositions,        // 0
                                          __global Vertex        *vertices,          // 1
                                          __global float3        *velocities,        // 2
