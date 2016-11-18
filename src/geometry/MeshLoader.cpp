@@ -242,7 +242,11 @@ namespace pbd {
         std::shared_ptr<Mesh> LoadMesh(const std::string &path) {
             Assimp::Importer importer;
 
-            const aiScene *scene = importer.ReadFile(path.c_str(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
+            const aiScene *scene = importer.ReadFile(path.c_str(),
+                                                     aiProcess_Triangulate
+                                                     | aiProcess_GenSmoothNormals
+                                                     | aiProcess_FlipUVs
+                                                     | aiProcess_JoinIdenticalVertices);
             if (!scene || !scene->HasMeshes()) {
                 return nullptr;
             }

@@ -89,6 +89,8 @@ __kernel void predict_positions(__global float3         *predictedPositions, // 
     
     velocity.y -= factor * deltaTime * 9.82f;
     DBG3_IF_ID(3, "newvelocity =", velocity);
+    
+    velocity = 0.99f * velocity;
         
     const float3 newposition = origposition + factor * deltaTime * velocity;
     

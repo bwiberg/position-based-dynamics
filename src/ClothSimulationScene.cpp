@@ -149,6 +149,7 @@ namespace pbd {
         /// ...
         /// ...
 
+        // if is grabbing cloth, move cloth vertex toward cursor ray
         if (mIsGrabbingCloth) {
             const glm::vec3 rayOrigin = getCameraWorldPosition();
             const glm::vec3 rayDirection = getCursorWorldRay();
@@ -182,6 +183,7 @@ namespace pbd {
                                       sizeof(cl_float3) * mGrabbedVertexIndex, sizeof(cl_float3), &velocityCL);
         }
 
+        /// apply gravity and predict positions
         for (auto clothmesh : mClothMeshes) {
             OCL_CALL(mPredictPositions->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
             OCL_CALL(mPredictPositions->setArg(1, clothmesh->mVertexVelocitiesBufferCL));
@@ -191,11 +193,17 @@ namespace pbd {
             ENQUEUE_VERTICES(mPredictPositions, clothmesh);
         }
 
+        /// do a number of position-level update iterations
         for (uint iter = 0; iter < mParams.numSubSteps; ++iter) {
+
+            /// update every clothmesh independently
             for (auto clothmesh : mClothMeshes) {
+
+                /// clip cloth vertices to be above ground plane
                 mClipToPlanes->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL);
                 ENQUEUE_VERTICES(mClipToPlanes, clothmesh);
 
+                /// calculate position correction based on cloth stretch/bend constraints
                 OCL_CALL(mCalcPositionCorrections->setArg(0, clothmesh->mVertexBufferCL));
                 OCL_CALL(mCalcPositionCorrections->setArg(1, clothmesh->mVertexClothBufferCL));
                 OCL_CALL(mCalcPositionCorrections->setArg(2, clothmesh->mEdgeBufferCL));
@@ -207,12 +215,14 @@ namespace pbd {
                 OCL_CALL(mCalcPositionCorrections->setArg(8, sizeof(ClothSimParams), (const void *) &mParams));
                 ENQUEUE_EDGES(mCalcPositionCorrections, clothmesh);
 
+                /// update predictions based on the corrections
                 OCL_CALL(mCorrectPredictions->setArg(0, clothmesh->mVertexPositionCorrectionsBufferCL));
                 OCL_CALL(mCorrectPredictions->setArg(1, clothmesh->mVertexPredictedPositionsBufferCL));
                 ENQUEUE_VERTICES(mCorrectPredictions, clothmesh);
             }
         }
 
+        /// write predicted/corrected position to actual position
         for (auto clothmesh : mClothMeshes) {
             OCL_CALL(mSetPositionsToPredicted->setArg(0, clothmesh->mVertexPredictedPositionsBufferCL));
             OCL_CALL(mSetPositionsToPredicted->setArg(1, clothmesh->mVertexBufferCL));
@@ -639,6 +649,7 @@ namespace pbd {
     glm::vec3 ClothSimulationScene::getCameraWorldPosition() {
         return glm::vec3(mCamera->getParent()->getTransform() * glm::vec4(mCamera->getPosition(), 1.0f));
     }
+
 
     glm::vec3 ClothSimulationScene::getCursorWorldRay() {
         /// Step 1: 3D normalized device coordinates
