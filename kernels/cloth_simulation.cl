@@ -42,19 +42,27 @@ typedef struct def_ClothSimParams {
     float k_bend;       // PBD stiffness constant for cloth bending constraint
 } ClothSimParams;
 
+/**
+ * Calculates the dihedral angle between the two triangles made up by [P1, P2, P3] and [P1, P4, P2].
+ */
 float calc_dihedral_angle(const float3 p1,
                           const float3 p2,
                           const float3 p3,
                           const float3 p4);
 
 
-
+/**
+ * Custom constructor for Float3 since I had some errors with the built-in float3(x,y,z) (?!?!)
+ */
 float3 Float3(float x, float y, float z);
 
+/**
+ * Custom cross product implementation since I had some errors with the built-in cross(u,v) (?!?!)
+ */
 float3 Cross(float3 u, float3 v);
 
 /**
- * Atomic
+ * Atomic addition of floats
  */
 void atomic_add_global_float(volatile __global float *addr, float val);
 
@@ -92,7 +100,9 @@ void cmpwise_atomic_add_global_float3(volatile __global float3 *addr, float3 val
 ////////////  ///////////////////////////////////////  ////////////
 
 /**
- * For every triangle
+ * (runs for every triangle)
+ *
+ * Calculates this triangle's mass and adds one third of it to each of its vertices.
  */
 __kernel void calc_cloth_mass(__global const Vertex                 *vertices,          // 0
                               volatile __global ClothVertexData     *clothVertices,     // 1
@@ -120,7 +130,7 @@ __kernel void calc_cloth_mass(__global const Vertex                 *vertices,  
     // save this mass into the triangle's memory
     clothTriangles[ID].mass = triangleMass;
 
-    // Store one third of the triangle's mass into each of its vertices.
+    // Add one third of the triangle's mass into each of its vertices.
     // Needs to use atomic operations since multiple threads might try
     // to add to the mass at the same time.
     atomic_add_global_float(&clothVertices[triangle.vertices[0]].mass,
@@ -135,21 +145,18 @@ __kernel void calc_cloth_mass(__global const Vertex                 *vertices,  
 }
 
 /**
- * For every vertex
+ * (runs for every vertex)
+ * Calculates the inverse mass of a cloth vertex
  */
 __kernel void calc_inverse_mass(__global ClothVertexData *clothVertices) {
     clothVertices[ID].invmass = 1.0f / clothVertices[ID].mass;
 }
 
-__kernel void fix_vertex(__global ClothVertexData *clothVertices,
-                         const int idToFix) {
-    if (ID != idToFix) return;
-    
-    clothVertices[ID].invmass = 0.0f;
-}
 
 /**
- * For every edge
+ * (runs for every edge)
+ *
+ * Setup kernel that calculates initial edge properties [length of edge, dihedral angle between adjacent triangles)
  */
 __kernel void calc_edge_properties(__global const Vertex        *vertices,          // 0
                                 __global const Triangle      *triangles,         // 1
@@ -169,6 +176,7 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
     clothEdges[ID].initialLength = length(p1 - p2);
 
     if (thisedge.triangles[1] == -1) {
+        // DO NOT calculate dihedral angle if edge only belongs to a single triangle
         clothEdges[ID].initialDihedralAngle = 0.0f;
         return;
     };
@@ -186,10 +194,16 @@ __kernel void calc_edge_properties(__global const Vertex        *vertices,      
 ////////////  //////////// POSITION CORRECTION KERNELS ////////////  ////////////
 ////////////  /////////////////////////////////////////////////////  ////////////
 
+
+/**
+ * (runs for every vertex)
+ *
+ * Clips vertex positions to be above the ground plane.
+ */
 __kernel void clip_to_planes(__global float3 *predictedPositions) {
     const float3 predictedPosition = predictedPositions[ID];
     
-    const float clippedY = max(predictedPosition.y, 0.3f);
+    const float clippedY = max(predictedPosition.y, 0.02f);
     const float3 clippedPosition = Float3(predictedPosition.x, clippedY, predictedPosition.z);
     
     DBG3_IF_ID(2, "predictedPosition=", predictedPosition);
@@ -202,7 +216,10 @@ __kernel void clip_to_planes(__global float3 *predictedPositions) {
 }
 
 /**
- * For every edge
+ * (runs for every edge)
+ *
+ * Calculates the position correction data for an edge, and updates the position correction vectors of its
+ * vertices (P1, P2) and the adjacent triangles' additional vertices (P3, P4).
  */
 __kernel void calc_position_corrections(__global const Vertex               *vertices,              // 0
                                      __global const ClothVertexData      *clothVertices,         // 1
@@ -314,7 +331,9 @@ __kernel void calc_position_corrections(__global const Vertex               *ver
 }
 
 /**
- *  For every vertex
+ *  (runs for every vertex)
+ *
+ *  Corrects position predictions by adding the position corrections to the predicted positions.
  */
 __kernel void correct_predictions(__global float3      *positionCorrections,   // 0
                                __global float3      *predictedPositions) {  // 1
