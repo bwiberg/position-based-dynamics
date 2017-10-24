@@ -1,7 +1,7 @@
 # Real-time cloth using Position-Based Dynamics in OpenCL
 Course assignment for CS 348C: Animation and Simulation, Fall 2016. Based on the paper [Position Based Dynamics](http://matthias-mueller-fischer.ch/publications/posBasedDyn.pdf) by Macklin and Müller.
 
-<img src="https://raw.githubusercontent.com/bwiberg/position-based-fluids/master/video.gif" width="500" >
+<img src="https://raw.githubusercontent.com/bwiberg/position-based-dynamics/master/video.gif" width="500" >
 
 ## Libraries
 * Based on the cl-gl-bootstrap template for C++ project with OpenCL-OpenGL interoperability, written by me.
